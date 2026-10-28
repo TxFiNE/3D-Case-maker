@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/EffectComposer.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/environments/RoomEnvironment.js">
+<title>PCForge — 3D PC Builder</title>
+<meta name="description" content="Interactive 3D PC configurator with compatibility checks, price totals and saved builds. Demo data only.">
+<style>
+:root{--bg:#0a0b0e;--p:#101216;--p2:#161920;--b:#232731;--b2:#313745;--t:#e9ebef;--m:#8a93a3;--a:#5eead4;--a2:#8b5cf6;--ok:#34d399;--w:#fbbf24;--bad:#f87171;--u:#94a3b8;--r:10px}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--p2);border:1px solid var(--b);border-radius:8px;padding:6px 10px;transition:.15s}
+button:hover{border-color:var(--b2);background:#1c202a}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.pri{background:linear-gradient(135deg,var(--a),#38bdf8);color:#03201c;border:0;font-weight:700}
+button.pri:hover{filter:brightness(1.1)}
+input,select{background:#0c0e12;border:1px solid var(--b);border-radius:8px;padding:6px 9px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.muted{color:var(--m)}
+/* top bar */
+#top{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--b);background:linear-gradient(#12141a,#0d0f13);overflow-x:auto;flex:none;white-space:nowrap}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.3px;font-size:15px;margin-right:6px}
+.brand i{width:22px;height:22px;border-radius:6px;background:conic-gradient(from 200deg,var(--a),var(--a2),var(--a));box-shadow:0 0 14px #5eead466;display:inline-block}
+.brand em{font-style:normal;font-size:10px;color:var(--a);border:1px solid #5eead455;border-radius:4px;padding:0 5px}
+#bname{font-weight:600;width:190px}
+#save{font-size:11px;color:var(--m);min-width:92px}
+#save.ok::before{content:"●";color:var(--ok);margin-right:5px}
+#gsearch{width:190px}
+.sp{flex:1}
+/* layout */
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 400px;min-height:0;position:relative}
+#view{position:relative;min-height:0;overflow:hidden;background:radial-gradient(900px 500px at 50% 30%,#171b24,#0a0b0e)}
+#gl{position:absolute;inset:0;outline:none}
+#gl canvas{display:block;width:100%;height:100%}
+#panel{border-left:1px solid var(--b);display:flex;flex-direction:column;min-height:0;background:var(--p)}
+#pscroll{flex:1;overflow:auto;padding:12px}
+#foot{border-top:1px solid var(--b);padding:12px;background:#0d0f13}
+.bar{height:6px;background:#1b1f27;border-radius:9px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--a2));transition:width .4s}
+/* toolbar */
+.tb{position:absolute;z-index:5;display:flex;flex-wrap:wrap;gap:5px}
+#tbTop{top:10px;left:10px;right:56px}
+.chip{background:#12151bf2;padding:4px 9px;font-size:12px;border-radius:999px}
+.chip[aria-pressed=true]{border-color:var(--a);color:var(--a);background:#5eead414}
+#tbBot{bottom:10px;left:10px;align-items:center;background:#12151bf2;border:1px solid var(--b);border-radius:12px;padding:6px 10px;gap:12px}
+#tbBot label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--m)}
+#tbBot input[type=range]{width:90px;padding:0}
+#tbBot input[type=color]{width:26px;height:22px;padding:0;border:0;background:none}
+.sw{width:18px;height:18px;border-radius:50%;padding:0;border:2px solid var(--b2)}
+.sw[aria-pressed=true]{border-color:var(--a)}
+#fs{position:absolute;top:10px;right:10px;z-index:5}
+#fid{position:absolute;right:12px;bottom:10px;z-index:4;font-size:11px;color:var(--m);max-width:300px;text-align:right;pointer-events:none}
+#fid b{color:var(--w)}
+#tip{position:absolute;z-index:6;pointer-events:none;background:#000c;border:1px solid var(--b2);padding:3px 8px;border-radius:6px;font-size:12px;display:none;white-space:nowrap}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+.lbl{position:absolute;transform:translate(-50%,-100%);font-size:10px;padding:1px 6px;border-radius:5px;background:#0009;border:1px solid #ffffff22;color:#cfd6e2;white-space:nowrap}
+#loading{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:#0a0b0e;color:var(--m);text-align:center;padding:20px}
+#loading.failed{z-index:3;pointer-events:none}
+#loading .spin{width:34px;height:34px;border:3px solid #232731;border-top-color:var(--a);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* slots */
+h3{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--m)}
+.slot{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--b);border-radius:var(--r);margin-bottom:7px;background:var(--p2);cursor:pointer;transition:.15s}
+.slot:hover{border-color:var(--b2)}
+.slot.sel{border-color:var(--a);box-shadow:0 0 0 1px #5eead433,0 0 18px #5eead414}
+.slot .ic{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:700;letter-spacing:.5px;background:#0c0e12;border:1px solid var(--b);color:var(--m);flex:none}
+.slot.has .ic{color:var(--a);border-color:#5eead455}
+.slot .tx{flex:1;min-width:0}
+.slot .tx small{display:block;color:var(--m);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.slot .tx b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.slot .pr{text-align:right;font-size:12px}
+.slot .x{padding:2px 7px}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;border:1px solid;letter-spacing:.03em}
+.b-compatible{color:var(--ok);border-color:#34d39966}
+.b-warning{color:var(--w);border-color:#fbbf2466}
+.b-incompatible{color:var(--bad);border-color:#f8717166}
+.b-unknown{color:var(--u);border-color:#94a3b866}
+.b-demo{color:#c4b5fd;border-color:#8b5cf666}
+.issue{border:1px solid var(--b);border-left-width:3px;border-radius:8px;padding:8px 10px;margin-bottom:7px;background:var(--p2)}
+.issue.incompatible{border-left-color:var(--bad)}.issue.warning{border-left-color:var(--w)}.issue.unknown{border-left-color:var(--u)}.issue.compatible{border-left-color:var(--ok)}
+.issue p{margin:3px 0;color:#c3c9d4}
+.issue small{color:var(--m);display:block}
+.issue .fix{color:var(--a)}
+details summary{cursor:pointer;color:var(--m);font-size:12px;margin:8px 0}
+.total{display:flex;justify-content:space-between;align-items:baseline}
+.total b{font-size:22px;letter-spacing:-.5px}
+.row{display:flex;justify-content:space-between;color:var(--m);font-size:12px;margin:2px 0}
+.warnbox{background:#fbbf2412;border:1px solid #fbbf2455;color:#fcd34d;border-radius:8px;padding:6px 9px;font-size:12px;margin:6px 0}
+.mini{width:62px;padding:3px 6px;text-align:right}
+.empty{border:1px dashed var(--b2);border-radius:var(--r);padding:14px;text-align:center;color:var(--m);margin-bottom:12px}
+.empty .btns{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+/* drawer */
+#drawer{position:absolute;top:0;right:0;bottom:0;width:min(470px,100%);z-index:20;background:#0e1014;border-left:1px solid var(--b2);transform:translateX(102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:-20px 0 50px #0008}
+#drawer.open{transform:none}
+#drawer header{padding:12px;border-bottom:1px solid var(--b);display:flex;gap:8px;align-items:center}
+#drawer header b{flex:1;font-size:15px}
+#dctl{padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:7px;border-bottom:1px solid var(--b)}
+#dctl input[type=search]{grid-column:1/-1}
+#dctl label{display:flex;gap:6px;align-items:center;color:var(--m);font-size:12px;grid-column:1/-1}
+#dlist{flex:1;overflow:auto;padding:12px}
+.card{border:1px solid var(--b);border-radius:var(--r);padding:11px;margin-bottom:9px;background:linear-gradient(#14171d,#101216)}
+.card.on{border-color:var(--a)}
+.card .h{display:flex;justify-content:space-between;gap:8px}
+.card .h b{font-size:14px}
+.card .spec{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0}
+.card .spec span{font-size:11px;background:#0b0d11;border:1px solid var(--b);border-radius:5px;padding:1px 6px;color:#b6bdca}
+.card .act{display:flex;gap:6px;align-items:center;margin-top:6px}
+table.sp2{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+table.sp2 td{padding:3px 0;border-bottom:1px solid #1b1f27}
+table.sp2 td:first-child{color:var(--m);width:42%}
+table.sp2 .na{color:#6b7380}
+/* detail card */
+#detail{position:absolute;left:10px;bottom:62px;width:min(330px,calc(100% - 20px));max-height:56%;overflow:auto;z-index:6;background:#0f1217f8;border:1px solid var(--b2);border-radius:12px;padding:12px;display:none}
+#detail.show{display:block}
+.alt{display:inline-block;margin:3px 4px 0 0;font-size:11px}
+dialog{background:#0f1217;color:var(--t);border:1px solid var(--b2);border-radius:14px;padding:18px;width:min(640px,94vw);max-height:86vh;box-shadow:0 30px 90px #000c}
+dialog::backdrop{background:#000a;}
+dialog h2{margin:0 0 10px;font-size:17px}
+dialog .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+dialog textarea{width:100%;min-height:120px;background:#0c0e12;color:var(--t);border:1px solid var(--b);border-radius:8px;padding:8px}
+table.cmp{width:100%;border-collapse:collapse}
+table.cmp td,table.cmp th{padding:5px 6px;border-bottom:1px solid var(--b);text-align:left;vertical-align:top}
+table.cmp tr.diff td{background:#fbbf240d}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(30px);opacity:0;transition:.25s;background:#12151b;border:1px solid var(--b2);padding:9px 16px;border-radius:10px;z-index:99;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#toast.err{border-color:var(--bad)}
+#toast.good{border-color:var(--ok)}
+@media (max-width:900px){
+  main{grid-template-columns:1fr;grid-template-rows:56vh minmax(0,1fr)}
+  #panel{border-left:0;border-top:1px solid var(--b)}
+  #bname{width:130px}#gsearch{width:120px}
+  #fid{display:none}
+  #detail{bottom:58px;max-height:45%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- responsive + touch + perf overrides ---- */
+html,body{height:100%;height:100dvh}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{touch-action:manipulation}
+#pscroll,#dlist,#detail{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#top,#tbTop{scrollbar-width:none}#top::-webkit-scrollbar,#tbTop::-webkit-scrollbar{display:none}
+.lbl{left:0;top:0;will-change:transform}
+#ltb{display:none}
+@media (max-width:1200px){main{grid-template-columns:minmax(0,1fr) 340px}}
+@media (max-width:900px){
+  main{grid-template-columns:1fr;grid-template-rows:minmax(230px,42dvh) minmax(0,1fr)}
+  #top{padding:6px 8px}
+  #tbTop{flex-wrap:nowrap;overflow-x:auto}
+  #tbTop .chip{flex:none}
+  #ltb{display:inline-block}
+  #tbBot{display:none;right:10px;flex-wrap:wrap}
+  #tbBot.open{display:flex}
+  #gsearch{width:110px}
+  #detail{left:8px;bottom:8px;max-height:62%}
+}
+@media (pointer:coarse){
+  button,select,input:not([type=range]):not([type=checkbox]):not([type=color]){min-height:40px}
+  input,select,textarea{font-size:16px}
+  .chip{padding:8px 12px}
+  .slot{padding:12px 10px}
+  .slot .x{padding:8px 13px}
+  #tbBot input[type=range]{width:110px}
+  .sw{width:30px;height:30px;min-height:0}
+}
+
+/* ---- left menu (phone) + buy list ---- */
+#rail{display:none}
+#foot{max-height:50%;overflow:auto}
+.row{align-items:center}
+.buy{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1b1f27}
+.buy .tx{flex:1;min-width:0}.buy .tx small{display:block;color:var(--m);font-size:10px;text-transform:uppercase}
+.buy .tx b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.amz{background:#ff9900;color:#111;font-weight:700;text-decoration:none;border-radius:8px;padding:8px 11px;font-size:12px;white-space:nowrap}
+@media (max-width:900px){
+  main{grid-template-columns:68px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+  #rail{display:flex;flex-direction:column;gap:6px;padding:8px 6px;border-right:1px solid var(--b);background:#0d0f13;grid-column:1;grid-row:1}
+  #rail button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 2px;font-size:11px;line-height:1.1;border-radius:12px}
+  #rail button b{font-size:22px;font-weight:400}
+  #rail button[aria-selected=true]{border-color:var(--a);color:var(--a);background:#5eead414}
+  #view,#panel{grid-column:2;grid-row:1}
+  #panel{border-top:0}
+  main[data-tab=view] #panel,main:not([data-tab=view]) #view{display:none}
+  main[data-tab=parts] #foot{display:none}
+  main[data-tab=price] #pscroll{display:none}
+  main[data-tab=price] #foot{flex:1;max-height:none}
+  #drawer{left:68px;width:auto}
+}
+</style>
+<script type="importmap">
+{"imports":{
+ "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+ "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<header id="top">
+  <div class="brand"><i></i>PCForge<em>3D</em></div>
+  <input id="bname" aria-label="Build name" maxlength="60">
+  <span id="save" class="ok">Saved</span>
+  <input id="gsearch" type="search" placeholder="Search all parts…" aria-label="Search all parts">
+  <div class="sp"></div>
+  <button id="bUndo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+  <button id="bRedo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+  <button id="bBuilds" title="Saved builds">Builds</button>
+  <button id="bNew" title="Start a new build">New</button>
+  <button id="bShare" title="Copy share link">Share</button>
+  <button id="bExport" title="Download build as JSON">Export</button>
+  <button id="bImport" title="Import build JSON">Import</button>
+  <button id="bSet" title="Settings">Settings</button>
+</header>
+<main data-tab="view">
+  <nav id="rail" aria-label="Sections"><button data-tab="view" aria-selected="true"><b>🖥️</b>Case</button><button data-tab="parts" aria-selected="false"><b>🧩</b>Parts</button><button data-tab="price" aria-selected="false"><b>💲</b>Price</button></nav>
+  <section id="view" aria-label="3D viewport">
+    <div id="gl" tabindex="0" aria-label="3D PC viewport. Press R to reset view, E to toggle exploded view."></div>
+    <div id="labels"></div>
+    <div id="tip"></div>
+    <div id="tbTop" class="tb" role="toolbar" aria-label="View controls"></div>
+    <button id="fs" class="chip" title="Fullscreen (F)" aria-label="Fullscreen">⛶</button>
+    <div id="tbBot" class="tb" aria-label="Lighting">
+      <label>Light <input id="light" type="range" min="0.3" max="2" step="0.05" aria-label="Light intensity"></label>
+      <label>BG <button class="sw" data-bg="0" style="background:#0a0b0e" aria-label="Graphite background"></button><button class="sw" data-bg="1" style="background:#0b1226" aria-label="Midnight background"></button><button class="sw" data-bg="2" style="background:#2a2e37" aria-label="Studio background"></button></label>
+      <label>RGB <input id="rgbc" type="color" aria-label="RGB color"> <button id="rainbow" class="chip" aria-pressed="false">Rainbow</button></label>
+    </div>
+    <div id="fid"><b>Placeholder geometry.</b> 3D parts are generic procedural shapes sized from catalog data — not manufacturer models.</div>
+    <div id="detail" role="region" aria-label="Component detail"></div>
+    <div id="loading"><div><div class="spin"></div><div id="loadmsg">Loading 3D engine…</div></div></div>
+  </section>
+  <aside id="panel" aria-label="Build">
+    <div id="pscroll"></div>
+    <div id="foot"></div>
+  </aside>
+  <div id="drawer" role="dialog" aria-label="Component picker" aria-hidden="true">
+    <header><b id="dtitle">Parts</b><button id="dclose" aria-label="Close picker">✕</button></header>
+    <div id="dctl">
+      <input id="dq" type="search" placeholder="Search name, brand, socket…" aria-label="Search parts">
+      <select id="dsort" aria-label="Sort"><option value="price-asc">Price ↑</option><option value="price-desc">Price ↓</option><option value="name">Name</option><option value="brand">Brand</option></select>
+      <select id="dbrand" aria-label="Manufacturer"></select>
+      <label><input id="dcompat" type="checkbox"> Hide parts that conflict with my build</label>
+    </div>
+    <div id="dlist"></div>
+  </div>
+</main>
+<dialog id="dlg"></dialog>
+<input id="file" type="file" accept="application/json,.json" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+/* =====================================================================
+   PCForge — single-file 3D PC configurator
+   • Catalog below is DEMO DATA (fictional brands, placeholder prices/specs).
+     Prices are NOT market prices. Import your own catalog in Settings.
+   • 3D parts are procedural placeholders, not manufacturer models.
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+/* ---------------- catalog (demo) ---------------- */
+const CATS=[
+ {id:'cpu',label:'CPU',ic:'CPU'},{id:'cooler',label:'CPU Cooler',ic:'COOL'},{id:'mobo',label:'Motherboard',ic:'MB'},
+ {id:'ram',label:'Memory',ic:'RAM'},{id:'gpu',label:'Graphics Card',ic:'GPU'},{id:'storage',label:'Storage',ic:'SSD'},
+ {id:'psu',label:'Power Supply',ic:'PSU'},{id:'case',label:'Case',ic:'CASE'}];
+const CAT=Object.fromEntries(CATS.map(c=>[c.id,c]));
+const D=(o)=>({currency:'USD',source:'Demo dataset (not a market price)',updated:'2026-10-28',demo:true,model:'procedural',...o});
+const DEMO=[
+ D({id:'cpu-n7',cat:'cpu',brand:'Nova',name:'Nova 7 8-Core',price:299,socket:'AM5',cores:8,threads:16,tdp:105,mem:['DDR5']}),
+ D({id:'cpu-n5',cat:'cpu',brand:'Nova',name:'Nova 5 6-Core',price:199,socket:'AM5',cores:6,threads:12,tdp:65,mem:['DDR5']}),
+ D({id:'cpu-h7',cat:'cpu',brand:'Helix',name:'Helix K7 12-Core',price:329,socket:'LGA1700',cores:12,threads:20,tdp:125,mem:['DDR4','DDR5']}),
+ D({id:'cpu-h5',cat:'cpu',brand:'Helix',name:'Helix K5 10-Core',price:null,socket:'LGA1700',cores:10,threads:16,tdp:65,mem:['DDR4','DDR5']}),
+ D({id:'mb-a1',cat:'mobo',brand:'Nova',name:'Nova X ATX',price:229,socket:'AM5',chipset:'X-Series',form:'ATX',memType:'DDR5',ramSlots:4,maxRam:192,m2:3,sata:4}),
+ D({id:'mb-a2',cat:'mobo',brand:'Nova',name:'Nova B mATX',price:149,socket:'AM5',chipset:'B-Series',form:'mATX',memType:'DDR5',ramSlots:4,maxRam:128,m2:2,sata:4}),
+ D({id:'mb-i1',cat:'mobo',brand:'Nova',name:'Nova B Mini-ITX',price:199,socket:'AM5',chipset:'B-Series',form:'ITX',memType:'DDR5',ramSlots:2,maxRam:64,m2:2,sata:2}),
+ D({id:'mb-h1',cat:'mobo',brand:'Helix',name:'Helix Z ATX',price:259,socket:'LGA1700',chipset:'Z-Series',form:'ATX',memType:'DDR5',ramSlots:4,maxRam:128,m2:4,sata:6}),
+ D({id:'mb-h2',cat:'mobo',brand:'Helix',name:'Helix B mATX (DDR4)',price:119,socket:'LGA1700',chipset:'B-Series',form:'mATX',memType:'DDR4',ramSlots:4,maxRam:128,m2:2,sata:4}),
+ D({id:'ram-5-32',cat:'ram',brand:'Arc',name:'Arc 32GB (2×16) DDR5-6000',price:109,memType:'DDR5',capacity:32,modules:2,speed:6000,cl:30}),
+ D({id:'ram-5-64',cat:'ram',brand:'Arc',name:'Arc 64GB (2×32) DDR5-6000',price:189,memType:'DDR5',capacity:64,modules:2,speed:6000,cl:32}),
+ D({id:'ram-4-32',cat:'ram',brand:'Arc',name:'Arc 32GB (4×8) DDR4-3600',price:79,memType:'DDR4',capacity:32,modules:4,speed:3600,cl:16}),
+ D({id:'ram-4-16',cat:'ram',brand:'Arc',name:'Arc 16GB (2×8) DDR4-3200',price:null,memType:'DDR4',capacity:16,modules:2,speed:3200,cl:16}),
+ D({id:'gpu-s',cat:'gpu',brand:'Vertex',name:'Vertex Compact 8GB',price:279,vram:8,length:242,slots:2,tdp:160,conn:1}),
+ D({id:'gpu-m',cat:'gpu',brand:'Vertex',name:'Vertex Pro 12GB',price:549,vram:12,length:304,slots:2.5,tdp:285,conn:2}),
+ D({id:'gpu-x',cat:'gpu',brand:'Vertex',name:'Vertex Ultra 24GB',price:1299,vram:24,length:336,slots:3.5,tdp:450,conn:3}),
+ D({id:'cl-lp',cat:'cooler',brand:'Aero',name:'Aero Low-Profile',price:35,kind:'Air (low profile)',height:47,sockets:['AM5','LGA1700'],tdp:95}),
+ D({id:'cl-t1',cat:'cooler',brand:'Aero',name:'Aero Tower 155',price:45,kind:'Air (single tower)',height:155,sockets:['AM5','LGA1700'],tdp:150}),
+ D({id:'cl-t2',cat:'cooler',brand:'Aero',name:'Aero Dual Tower 168',price:79,kind:'Air (dual tower)',height:168,towers:2,sockets:['AM5','LGA1700'],tdp:220}),
+ D({id:'cl-a240',cat:'cooler',brand:'Tide',name:'Tide AIO 240',price:109,kind:'Liquid (AIO)',height:55,radiator:240,sockets:['AM5','LGA1700'],tdp:240}),
+ D({id:'cl-a360',cat:'cooler',brand:'Tide',name:'Tide AIO 360',price:159,kind:'Liquid (AIO)',height:55,radiator:360,sockets:['AM5','LGA1700'],tdp:300}),
+ D({id:'cs-m1',cat:'case',brand:'Monolith',name:'Monolith Glass Mid-Tower',price:119,dims:[230,480,460],mobo:['ATX','mATX','ITX'],gpuMax:360,slots:7,coolerMax:170,psu:['ATX'],psuMax:200,rad:[240,360],bays25:2,bays35:2,panel:'Tempered glass',color:0x24272e,style:'mesh',fans:{front:3,rear:1}}),
+ D({id:'cs-m2',cat:'case',brand:'Pillar',name:'Pillar White Mid-Tower',price:99,dims:[225,470,440],mobo:['ATX','mATX','ITX'],gpuMax:330,slots:7,coolerMax:160,psu:['ATX'],psuMax:180,rad:[240],bays25:2,bays35:1,panel:'Tempered glass',color:0xdfe3ea,style:'solid',fans:{front:3,rear:1}}),
+ D({id:'cs-c1',cat:'case',brand:'Monolith',name:'Monolith Cube Mini',price:129,dims:[200,360,380],mobo:['ITX'],gpuMax:320,slots:3,coolerMax:70,psu:['SFX'],psuMax:130,rad:[],bays25:1,bays35:0,panel:'Tempered glass',color:0x30343d,style:'mesh',fans:{front:0,rear:1}}),
+ D({id:'psu-550',cat:'psu',brand:'Forge',name:'Forge 550W Bronze',price:69,watts:550,form:'ATX',length:140,eff:'80+ Bronze',pcie:2}),
+ D({id:'psu-750',cat:'psu',brand:'Forge',name:'Forge 750W Gold',price:109,watts:750,form:'ATX',length:160,eff:'80+ Gold',pcie:3}),
+ D({id:'psu-1000',cat:'psu',brand:'Forge',name:'Forge 1000W Gold',price:189,watts:1000,form:'ATX',length:180,eff:'80+ Gold',pcie:4}),
+ D({id:'psu-sfx',cat:'psu',brand:'Forge',name:'Forge SFX 650W Gold',price:129,watts:650,form:'SFX',length:100,eff:'80+ Gold',pcie:2}),
+ D({id:'ssd-1',cat:'storage',brand:'Quill',name:'Quill NVMe 1TB',price:99,kind:'SSD',capacity:1000,iface:'NVMe',form:'M.2 2280'}),
+ D({id:'ssd-2',cat:'storage',brand:'Quill',name:'Quill NVMe 2TB',price:169,kind:'SSD',capacity:2000,iface:'NVMe',form:'M.2 2280'}),
+ D({id:'ssd-s',cat:'storage',brand:'Quill',name:'Quill SATA SSD 1TB',price:79,kind:'SSD',capacity:1000,iface:'SATA',form:'2.5"'}),
+ D({id:'hdd-4',cat:'storage',brand:'Quill',name:'Quill Disk 4TB',price:null,kind:'HDD',capacity:4000,iface:'SATA',form:'3.5"'}),
+];
+const SPECS={
+ cpu:[['socket','Socket'],['cores','Cores'],['threads','Threads'],['tdp','TDP',v=>v+' W'],['mem','Memory',v=>v.join(' / ')]],
+ mobo:[['socket','Socket'],['chipset','Chipset'],['form','Form factor'],['memType','Memory'],['ramSlots','RAM slots'],['maxRam','Max RAM',v=>v+' GB'],['m2','M.2 slots'],['sata','SATA ports']],
+ gpu:[['vram','VRAM',v=>v+' GB'],['length','Length',v=>v+' mm'],['slots','Slot width',v=>v+' slots'],['tdp','Board power',v=>v+' W'],['conn','8-pin PCIe',v=>v+'×']],
+ ram:[['memType','Type'],['capacity','Kit',v=>v+' GB'],['modules','Modules',v=>v+'×'],['speed','Speed',v=>v+' MT/s'],['cl','CAS',v=>'CL'+v]],
+ cooler:[['kind','Type'],['height','Height',v=>v+' mm'],['radiator','Radiator',v=>v+' mm'],['sockets','Sockets',v=>v.join(', ')],['tdp','Rated for',v=>v+' W']],
+ case:[['dims','Size W×H×D',v=>v.join('×')+' mm'],['mobo','Boards',v=>v.join(', ')],['gpuMax','Max GPU',v=>v+' mm'],['coolerMax','Max cooler',v=>v+' mm'],['psu','PSU form',v=>v.join(', ')],['psuMax','Max PSU length',v=>v+' mm'],['rad','Top radiator',v=>v.length?v.join(', ')+' mm':'none'],['panel','Side panel']],
+ psu:[['watts','Rated',v=>v+' W'],['form','Form factor'],['length','Length',v=>v+' mm'],['eff','Efficiency'],['pcie','PCIe 8-pin',v=>v+'×']],
+ storage:[['kind','Type'],['capacity','Capacity',v=>v>=1000?v/1000+' TB':v+' GB'],['iface','Interface'],['form','Form factor']]};
+const NAMES=['id','cat','name','brand','price','currency','source','updated','demo','model'];
+
+/* ---------------- state ---------------- */
+const KEY='pcforge.v1';
+const DEF_SET={perf:false,tax:0,ship:0,currency:'USD',glass:true,shell:true,rgb:true,grid:true,shadows:true,labels:true,env:true,spin:true,autorot:false,light:1,bg:0,rgbc:'#5eead4',rainbow:false};
+let store=loadStore();
+function loadStore(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));
+    if(s&&Array.isArray(s.builds)&&s.builds.length){s.settings={...DEF_SET,...(s.settings||{})};s.custom=Array.isArray(s.custom)?s.custom:[];if(!s.builds.find(b=>b.id===s.current))s.current=s.builds[0].id;return s}}catch(e){}
+  const id=uid();return{builds:[{id,name:'My First Build',parts:{},updated:Date.now()}],current:id,settings:{...DEF_SET},custom:[],favs:[]};
+}
+let catalog=[],byId={};
+function rebuildCatalog(){catalog=[...DEMO,...store.custom];byId=Object.fromEntries(catalog.map(p=>[p.id,p]))}
+rebuildCatalog();
+const O=store.settings; // view + app options
+const V={explode:false}; // transient view state
+const MOBILE=matchMedia('(pointer:coarse)').matches||innerWidth<700;
+const LOW=()=>O.perfUser?!!O.perf:(!!O.perf||MOBILE);
+const cur=()=>store.builds.find(b=>b.id===store.current);
+let hist=[],fut=[],sel=null;
+let saveT;
+function persist(){
+  $('#save').textContent='Saving…';$('#save').classList.remove('ok');
+  clearTimeout(saveT);saveT=setTimeout(()=>{
+    try{localStorage.setItem(KEY,JSON.stringify(store));$('#save').textContent='Saved '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});$('#save').classList.add('ok')}
+    catch(e){$('#save').textContent='Not saved (storage blocked)'}
+  },250);
+}
+function setParts(parts,{push=true}={}){
+  if(push){hist.push(JSON.stringify(cur().parts));if(hist.length>80)hist.shift();fut=[]}
+  cur().parts=parts;cur().updated=Date.now();persist();refresh();
+}
+function setPart(cat,id){const p={...cur().parts};if(id)p[cat]=id;else delete p[cat];setParts(p)}
+function undo(){if(!hist.length)return;fut.push(JSON.stringify(cur().parts));cur().parts=JSON.parse(hist.pop());persist();refresh()}
+function redo(){if(!fut.length)return;hist.push(JSON.stringify(cur().parts));cur().parts=JSON.parse(fut.pop());persist();refresh()}
+
+/* ---------------- money ---------------- */
+const fmt=(v,c='USD')=>{try{return new Intl.NumberFormat(undefined,{style:'currency',currency:c,maximumFractionDigits:v%1?2:0}).format(v)}catch{return c+' '+v}};
+function total(parts){
+  let sum=0,known=0,missing=[],excluded=[];const cc=O.currency;
+  for(const c of CATS){const p=byId[parts[c.id]];if(!p)continue;
+    if(p.price==null){missing.push(p.name);continue}
+    if(p.currency!==cc){excluded.push(p.name+' ('+p.currency+')');continue}
+    sum+=p.price;known++}
+  const tax=O.tax>0?sum*O.tax/100:0,ship=O.ship>0?+O.ship:0;
+  return{sum,known,missing,excluded,tax,ship,grand:sum+tax+ship,cc};
+}
+const ageDays=p=>(Date.now()-Date.parse(p.updated))/864e5;
+function priceHTML(p){
+  if(p.price==null)return'<span class="muted">Price unavailable</span>';
+  const stale=!isNaN(ageDays(p))&&ageDays(p)>30;
+  return`<b>${fmt(p.price,p.currency)}</b> <span class="badge b-demo" title="${esc(p.source)}">${p.demo?'DEMO':'IMPORTED'}</span>${stale?' <span class="badge b-warning">STALE</span>':''}`;
+}
+
+/* ---------------- compatibility engine ---------------- */
+const LV={compatible:0,unknown:1,warning:2,incompatible:3};
+function power(b){
+  const g=c=>byId[b[c]];const cpu=g('cpu'),gpu=g('gpu');
+  const known=[cpu?.tdp,gpu?.tdp].filter(v=>typeof v==='number');
+  if(!known.length)return null;
+  return{watts:known.reduce((a,v)=>a+v,0)+75,complete:!!(cpu&&gpu&&typeof cpu.tdp==='number'&&typeof gpu.tdp==='number'),cpu:cpu?.tdp,gpu:gpu?.tdp};
+}
+function analyze(b){
+  const g=c=>byId[b[c]];const out=[];
+  const add=(level,id,title,reason,parts,evidence,fix)=>out.push({level,id,title,reason,parts,evidence,fix:fix||''});
+  const cpu=g('cpu'),mb=g('mobo'),ram=g('ram'),gpu=g('gpu'),cl=g('cooler'),cs=g('case'),psu=g('psu'),st=g('storage');
+  const has=v=>v!==undefined&&v!==null;
+  if(cpu&&mb){
+    if(!cpu.socket||!mb.socket)add('unknown','socket','CPU socket unverified','Socket data is missing for one of the parts.',['cpu','mobo'],'No socket field.','Check the manufacturer spec sheet.');
+    else if(cpu.socket!==mb.socket)add('incompatible','socket','CPU / motherboard socket mismatch',`${cpu.name} uses ${cpu.socket} but ${mb.name} has a ${mb.socket} socket.`,['cpu','mobo'],`CPU: ${cpu.socket} · Board: ${mb.socket}`,`Pick a ${cpu.socket} motherboard or a ${mb.socket} CPU.`);
+    else add('compatible','socket','CPU socket matches',`Both use ${cpu.socket}.`,['cpu','mobo'],`${cpu.socket} = ${mb.socket}`);
+    if(cpu.socket===mb.socket)add('unknown','bios','BIOS / chipset support not verified','The catalog has no verified CPU-support list for this board, so BIOS compatibility is unknown.',['cpu','mobo'],'No BIOS data in dataset.','Check the board vendor’s CPU support list.');
+  }
+  if(ram&&mb){
+    if(!ram.memType||!mb.memType)add('unknown','ramtype','Memory type unverified','Missing memory type data.',['ram','mobo'],'','');
+    else if(ram.memType!==mb.memType)add('incompatible','ramtype','Memory generation mismatch',`${ram.name} is ${ram.memType} but ${mb.name} supports ${mb.memType}.`,['ram','mobo'],`RAM: ${ram.memType} · Board: ${mb.memType}`,`Choose ${mb.memType} memory or a ${ram.memType} board.`);
+    else add('compatible','ramtype','Memory type matches',`${ram.memType} on both.`,['ram','mobo'],`${ram.memType}`);
+    if(has(ram.modules)&&has(mb.ramSlots)){ if(ram.modules>mb.ramSlots)add('incompatible','ramslots','Not enough memory slots',`Kit has ${ram.modules} modules, board has ${mb.ramSlots} slots.`,['ram','mobo'],`${ram.modules} > ${mb.ramSlots}`,'Pick a kit with fewer modules.')}
+    if(has(ram.capacity)&&has(mb.maxRam)&&ram.capacity>mb.maxRam)add('incompatible','ramcap','Memory exceeds board limit',`${ram.capacity} GB kit vs ${mb.maxRam} GB max.`,['ram','mobo'],`${ram.capacity} > ${mb.maxRam} GB`,'Choose a smaller kit.');
+  }
+  if(ram&&cpu&&cpu.mem&&ram.memType&&!cpu.mem.includes(ram.memType))add('incompatible','cpumem','CPU does not support this memory',`${cpu.name} supports ${cpu.mem.join('/')}; kit is ${ram.memType}.`,['ram','cpu'],`Supported: ${cpu.mem.join(', ')}`,'Choose a supported memory type.');
+  if(mb&&cs){
+    if(!cs.mobo||!mb.form)add('unknown','form','Board size unverified','Missing form-factor data.',['mobo','case'],'','');
+    else if(!cs.mobo.includes(mb.form))add('incompatible','form','Motherboard does not fit the case',`${cs.name} supports ${cs.mobo.join(', ')}; ${mb.name} is ${mb.form}.`,['mobo','case'],`Board: ${mb.form}`,'Pick a larger case or a smaller board.');
+    else add('compatible','form','Board form factor fits',`${mb.form} is supported.`,['mobo','case'],`${mb.form} ∈ [${cs.mobo.join(', ')}]`);
+  }
+  if(gpu&&cs){
+    if(!has(gpu.length)||!has(cs.gpuMax))add('unknown','gpulen','GPU clearance unverified','Missing GPU length or case clearance.',['gpu','case'],'','');
+    else if(gpu.length>cs.gpuMax)add('incompatible','gpulen','GPU too long for case',`${gpu.name} is ${gpu.length} mm; ${cs.name} allows ${cs.gpuMax} mm.`,['gpu','case'],`${gpu.length} mm > ${cs.gpuMax} mm`,'Choose a shorter GPU or a roomier case.');
+    else if(cs.gpuMax-gpu.length<10)add('warning','gpulen','Tight GPU clearance',`Only ${cs.gpuMax-gpu.length} mm spare — front fans/radiators or cables may interfere.`,['gpu','case'],`${gpu.length} of ${cs.gpuMax} mm`,'Leave more margin if you plan a front radiator.');
+    else add('compatible','gpulen','GPU length fits',`${cs.gpuMax-gpu.length} mm spare.`,['gpu','case'],`${gpu.length} ≤ ${cs.gpuMax} mm`);
+    if(has(gpu.slots)&&has(cs.slots)&&Math.ceil(gpu.slots)>cs.slots)add('incompatible','gpuslot','Not enough expansion slots',`${gpu.slots}-slot card in a ${cs.slots}-slot case.`,['gpu','case'],'','Choose a thinner card.');
+  }
+  if(cl&&cpu){
+    if(!cl.sockets||!cpu.socket)add('unknown','clsock','Cooler socket unverified','Missing socket data.',['cooler','cpu'],'','');
+    else if(!cl.sockets.includes(cpu.socket))add('incompatible','clsock','Cooler does not support the CPU socket',`${cl.name} supports ${cl.sockets.join(', ')}; CPU is ${cpu.socket}.`,['cooler','cpu'],'','Pick a cooler with a matching mounting kit.');
+    else add('compatible','clsock','Cooler socket supported',`${cpu.socket} supported.`,['cooler','cpu'],cl.sockets.join(', '));
+    if(has(cl.tdp)&&has(cpu.tdp)&&cl.tdp<cpu.tdp)add('warning','cltdp','Cooler may be undersized',`${cl.name} is rated for ${cl.tdp} W; CPU TDP is ${cpu.tdp} W.`,['cooler','cpu'],`${cl.tdp} < ${cpu.tdp} W`,'Choose a higher-rated cooler.');
+  }
+  if(cl&&cs){
+    if(cl.radiator){
+      if(!cs.rad)add('unknown','rad','Radiator support unverified','No radiator data for this case.',['cooler','case'],'','');
+      else if(!cs.rad.includes(cl.radiator))add('incompatible','rad','Radiator not supported',`${cl.name} needs a ${cl.radiator} mm radiator mount; case supports ${cs.rad.length?cs.rad.join('/')+' mm':'none'}.`,['cooler','case'],'','Pick a smaller radiator or another case.');
+      else add('compatible','rad','Radiator fits',`${cl.radiator} mm top mount supported.`,['cooler','case'],'');
+    }else if(has(cl.height)&&has(cs.coolerMax)){
+      if(cl.height>cs.coolerMax)add('incompatible','clh','Cooler too tall',`${cl.name} is ${cl.height} mm; case allows ${cs.coolerMax} mm.`,['cooler','case'],`${cl.height} > ${cs.coolerMax} mm`,'Pick a lower-profile cooler or a wider case.');
+      else add('compatible','clh','Cooler height fits',`${cs.coolerMax-cl.height} mm spare.`,['cooler','case'],`${cl.height} ≤ ${cs.coolerMax} mm`);
+    }
+  }
+  if(psu&&cs){
+    if(cs.psu&&psu.form&&!cs.psu.includes(psu.form))add('incompatible','psuform','PSU form factor not supported',`${cs.name} takes ${cs.psu.join('/')}; PSU is ${psu.form}.`,['psu','case'],'','Choose a matching PSU form factor.');
+    else if(cs.psu&&psu.form)add('compatible','psuform','PSU form factor fits',psu.form,['psu','case'],'');
+    if(has(psu.length)&&has(cs.psuMax)&&psu.length>cs.psuMax)add('incompatible','psulen','PSU too long',`${psu.length} mm vs ${cs.psuMax} mm allowed.`,['psu','case'],'','Pick a shorter PSU.');
+  }
+  const pw=power(b);
+  if(psu&&pw){
+    if(!has(psu.watts))add('unknown','watt','PSU rating unknown','',['psu'],'','');
+    else if(pw.watts>psu.watts)add('incompatible','watt','PSU too small',`Estimated peak ≈ ${pw.watts} W exceeds the ${psu.watts} W rating.`,['psu','cpu','gpu'],`Estimate ${pw.watts} W vs ${psu.watts} W`,'Choose a higher-wattage PSU.');
+    else if(pw.watts*1.25>psu.watts)add('warning','watt','Low PSU headroom',`Estimated ≈ ${pw.watts} W on a ${psu.watts} W unit (${Math.round((1-pw.watts/psu.watts)*100)}% headroom). 25%+ is recommended.`,['psu','cpu','gpu'],`${pw.watts}/${psu.watts} W`,'Pick a PSU with more capacity.');
+    else add('compatible','watt','PSU capacity OK',`≈ ${pw.watts} W of ${psu.watts} W (${Math.round((1-pw.watts/psu.watts)*100)}% headroom).`,['psu'],'Estimate, not measured.');
+    if(!pw.complete)add('unknown','watt2','Power estimate incomplete','Add both a CPU and a GPU for a meaningful estimate.',['psu'],'','');
+  }
+  if(psu&&gpu&&has(gpu.conn)&&has(psu.pcie)){
+    if(gpu.conn>psu.pcie)add('incompatible','conn','Missing GPU power connectors',`${gpu.name} needs ${gpu.conn}× 8-pin PCIe; ${psu.name} provides ${psu.pcie}.`,['psu','gpu'],`${gpu.conn} > ${psu.pcie}`,'Choose a PSU with more PCIe connectors.');
+    else add('compatible','conn','GPU power connectors available',`${gpu.conn}× needed, ${psu.pcie}× provided.`,['psu','gpu'],'');
+  }
+  if(st&&mb){
+    if(st.iface==='NVMe'&&has(mb.m2)&&mb.m2<1)add('incompatible','m2','No M.2 slot','',['storage','mobo'],'','');
+    if(st.iface==='SATA'&&has(mb.sata)&&mb.sata<1)add('incompatible','sata','No SATA ports','',['storage','mobo'],'','');
+  }
+  if(st&&cs){
+    if(st.form==='3.5"'&&has(cs.bays35)&&cs.bays35<1)add('incompatible','bay','No 3.5" drive bay',`${cs.name} has no 3.5" bays.`,['storage','case'],'','Choose an SSD or a different case.');
+    if(st.form==='2.5"'&&has(cs.bays25)&&cs.bays25<1)add('incompatible','bay','No 2.5" drive bay','',['storage','case'],'','Choose an M.2 drive.');
+  }
+  return out;
+}
+const worst=list=>list.reduce((a,i)=>Math.max(a,LV[i.level]),0);
+const lvName=n=>Object.keys(LV).find(k=>LV[k]===n);
+function conflictsFor(cat,p){ // would swapping this part cause problems with the rest of the build?
+  const b={...cur().parts,[cat]:p.id};
+  return analyze(b).filter(i=>i.parts.includes(cat)&&(i.level==='incompatible'||i.level==='warning'));
+}
+
+/* ---------------- UI: panel ---------------- */
+function specRows(p){return(SPECS[p.cat]||[]).map(([k,l,f])=>{const v=p[k];return[l,v==null?null:(f?f(v):v)]})}
+function refresh(){renderPanel();renderFoot();renderDetail();$('#bname').value!==cur().name&&($('#bname').value=cur().name);$('#bUndo').disabled=!hist.length;$('#bRedo').disabled=!fut.length;if(drawerCat!==undefined)renderDrawer();build3D()}
+function renderPanel(){
+  const b=cur().parts,an=analyze(b),filled=CATS.filter(c=>b[c.id]).length;
+  const bad=an.filter(i=>i.level!=='compatible');
+  let h='';
+  if(!filled)h+=`<div class="empty"><b style="color:var(--t)">Start your build</b><br>Pick parts one by one, or load a ready-made compatible demo build.<div class="btns"><button class="pri" data-preset="gaming">Gaming ATX</button><button data-preset="ent">Enthusiast</button><button data-preset="mini">Mini-ITX</button></div></div>`;
+  h+=`<h3>Components · ${filled}/${CATS.length}</h3><div class="bar" style="margin-bottom:10px"><i style="width:${filled/CATS.length*100}%"></i></div>`;
+  for(const c of CATS){
+    const p=byId[b[c.id]];const iss=p?an.filter(i=>i.parts.includes(c.id)&&i.level!=='compatible'):[];const w=iss.length?lvName(worst(iss)):'';
+    h+=`<div class="slot ${p?'has':''} ${sel===c.id?'sel':''}" data-slot="${c.id}" tabindex="0" role="button" aria-label="${c.label}: ${p?esc(p.name):'empty'}">
+      <div class="ic">${c.ic}</div>
+      <div class="tx"><small>${c.label}</small><b>${p?esc(p.name):'<span class="muted" style="font-weight:400">Choose…</span>'}</b></div>
+      <div class="pr">${p?(p.price==null?'<span class="muted">n/a</span>':fmt(p.price,p.currency))+(w?`<br><span class="badge b-${w}">${w}</span>`:''):''}</div>
+      ${p?`<button class="x" data-rm="${c.id}" aria-label="Remove ${c.label}" title="Remove">✕</button>`:''}</div>`;
+  }
+  h+=`<h3 style="margin-top:16px">Compatibility</h3>`;
+  const missing=CATS.filter(c=>!b[c.id]);
+  if(missing.length&&filled)h+=`<div class="issue unknown"><b>Missing parts</b><small>${missing.map(c=>c.label).join(' · ')}</small></div>`;
+  if(!bad.length&&filled>1)h+=`<div class="issue compatible"><b>No problems found</b><small>${an.length} check(s) passed. Unverified items are shown as “unknown”.</small></div>`;
+  if(filled<2)h+=`<div class="muted">Add two or more parts to see compatibility checks.</div>`;
+  const ord=[...bad].sort((a,b)=>LV[b.level]-LV[a.level]);
+  for(const i of ord)h+=issueHTML(i);
+  const ok=an.filter(i=>i.level==='compatible');
+  if(ok.length)h+=`<details><summary>${ok.length} passed check(s)</summary>${ok.map(issueHTML).join('')}</details>`;
+  h+=`<div class="muted" style="font-size:11px;margin-top:12px">Rules are explicit and based only on catalog fields. Missing data stays “unknown” — it is never assumed compatible.</div>`;
+  {const ps=$('#pscroll'),sc=ps.scrollTop;ps.innerHTML=h;ps.scrollTop=sc}
+}
+const issueHTML=i=>`<div class="issue ${i.level}"><span class="badge b-${i.level}">${i.level.toUpperCase()}</span> <b>${esc(i.title)}</b>${i.reason?`<p>${esc(i.reason)}</p>`:''}<small>Affects: ${i.parts.map(p=>CAT[p]?.label||p).join(', ')}${i.evidence?' · Evidence: '+esc(i.evidence):''}</small>${i.fix?`<small class="fix">→ ${esc(i.fix)}</small>`:''}</div>`;
+function renderFoot(){
+  const b=cur().parts,t=total(b),pw=power(b),psu=byId[b.psu];
+  const nParts=CATS.filter(c=>b[c.id]).length;
+  let h=`<div class="total"><span class="muted">${t.known?'Known-price total':'Total'}</span><b>${fmt(t.grand,t.cc)}</b></div>`;
+  if(t.missing.length||t.excluded.length||nParts<CATS.length)h+=`<div class="warnbox">Incomplete total${t.missing.length?` · no price: ${esc(t.missing.join(', '))}`:''}${t.excluded.length?` · other currency (no rate configured): ${esc(t.excluded.join(', '))}`:''}${nParts<CATS.length?` · ${CATS.length-nParts} part(s) not chosen`:''}</div>`;
+  h+=`<div class="row"><span>Parts subtotal</span><span>${fmt(t.sum,t.cc)}</span></div>
+  <div class="row"><span>Shipping <input class="mini" id="ship" type="number" min="0" step="1" value="${O.ship||''}" placeholder="0" aria-label="Shipping amount"></span><span>${t.ship?fmt(t.ship,t.cc):'—'}</span></div>
+  <div class="row"><span>Tax % <input class="mini" id="tax" type="number" min="0" max="40" step="0.5" value="${O.tax||''}" placeholder="0" aria-label="Tax rate percent"></span><span>${t.tax?fmt(t.tax,t.cc):'—'}</span></div>
+  <div class="muted" style="font-size:10px">Demo prices — not live market prices. Tax/shipping are only your own entries.</div>`;
+  if(pw){const cap=psu?.watts;const pct=cap?Math.min(100,pw.watts/cap*100):0;
+    h+=`<div class="row" style="margin-top:8px"><span>Est. peak power${pw.complete?'':' (partial)'}</span><span style="color:var(--t)">≈ ${pw.watts} W${cap?` / ${cap} W`:''}</span></div>`;
+    if(cap)h+=`<div class="bar"><i style="width:${pct}%;${pct>100*.8?'background:var(--w)':''}${pw.watts>cap?';background:var(--bad)':''}"></i></div>`;
+    h+=`<div class="muted" style="font-size:10px;margin-top:3px">Estimate = CPU TDP + GPU board power + 75 W assumed rest-of-system. Not measured.</div>`;}
+  const bl=CATS.filter(c=>b[c.id]).map(c=>{const p=byId[b[c.id]];const u=/^https?:\/\//.test(p.url||'')?p.url:'https://www.amazon.com/s?k='+encodeURIComponent((p.brand||'')+' '+p.name);return `<div class="buy"><div class="tx"><small>${c.label}</small><b>${esc(p.name)}</b></div><span>${p.price==null?'—':fmt(p.price,p.currency)}</span><a class="amz" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Amazon ↗</a></div>`}).join('');
+  if(bl)h+=`<h3 style="margin-top:14px">Where to buy</h3>${bl}<div class="muted" style="font-size:10px;margin-top:4px">Each link opens an Amazon search for that part. Demo parts use fictional brands, so results only match once you use real products.</div>`;
+  $('#foot').innerHTML=h;
+  $('#ship').onchange=e=>{O.ship=Math.max(0,+e.target.value||0);persist();renderFoot()};
+  $('#tax').onchange=e=>{O.tax=Math.min(40,Math.max(0,+e.target.value||0));persist();renderFoot()};
+}
+/* detail card */
+function renderDetail(){
+  const el=$('#detail');const p=sel&&byId[cur().parts[sel]];
+  if(!p){el.classList.remove('show');return}
+  const iss=analyze(cur().parts).filter(i=>i.parts.includes(sel)&&i.level!=='compatible');
+  const alts=catalog.filter(x=>x.cat===sel&&x.id!==p.id&&!conflictsFor(sel,x).some(i=>i.level==='incompatible')).slice(0,4);
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px"><div><small class="muted">${CAT[sel].label} · ${esc(p.brand)}</small><div style="font-weight:700;font-size:15px">${esc(p.name)}</div></div><button id="dx" aria-label="Close details">✕</button></div>
+   <div style="margin:6px 0">${priceHTML(p)}<div class="muted" style="font-size:11px">${esc(p.source)} · updated ${esc(p.updated)} · no verified retailer link</div></div>
+   <div class="warnbox" style="margin:6px 0">3D model: generic procedural placeholder${p.model==='procedural'?'':' ('+esc(p.model)+')'} — sized from catalog dimensions, not a manufacturer replica.</div>
+   <table class="sp2">${specRows(p).map(([l,v])=>`<tr><td>${l}</td><td class="${v==null?'na':''}">${v==null?'unknown':esc(v)}</td></tr>`).join('')}</table>
+   ${iss.length?iss.map(issueHTML).join(''):''}
+   ${alts.length?`<div class="muted" style="margin-top:8px;font-size:11px">Compatible alternatives</div>${alts.map(a=>`<button class="alt" data-swap="${a.id}">${esc(a.name)} · ${a.price==null?'n/a':fmt(a.price,a.currency)}</button>`).join('')}`:''}
+   <div class="act" style="display:flex;gap:6px;margin-top:10px"><button data-change="${sel}" class="pri">Change…</button><button data-rm="${sel}">Remove</button></div>`;
+  el.classList.add('show');
+}
+
+/* ---------------- drawer ---------------- */
+let drawerCat; // undefined = closed, null = all, 'cpu' = category
+let expanded=new Set();
+function openDrawer(cat,q=''){
+  drawerCat=cat;$('#dq').value=q;$('#dtitle').textContent=cat?('Choose '+CAT[cat].label):'Search all parts';
+  const brands=[...new Set(catalog.filter(p=>!cat||p.cat===cat).map(p=>p.brand))].sort();
+  $('#dbrand').innerHTML='<option value="">All brands</option>'+brands.map(b=>`<option>${esc(b)}</option>`).join('');
+  $('#drawer').classList.add('open');$('#drawer').setAttribute('aria-hidden','false');renderDrawer();
+  setTimeout(()=>$('#dq').focus(),250);
+}
+function closeDrawer(){drawerCat=undefined;$('#drawer').classList.remove('open');$('#drawer').setAttribute('aria-hidden','true')}
+function renderDrawer(){
+  if(drawerCat===undefined)return;
+  const q=$('#dq').value.trim().toLowerCase(),brand=$('#dbrand').value,sort=$('#dsort').value,hide=$('#dcompat').checked;
+  let list=catalog.filter(p=>(!drawerCat||p.cat===drawerCat)&&(!brand||p.brand===brand));
+  if(q)list=list.filter(p=>[p.name,p.brand,p.socket,p.memType,p.form,p.iface,p.kind,p.cat,CAT[p.cat].label,...(p.aliases||[])].join(' ').toLowerCase().includes(q));
+  const items=list.map(p=>({p,iss:conflictsFor(p.cat,p)}));
+  let shown=hide?items.filter(x=>!x.iss.some(i=>i.level==='incompatible')):items;
+  const pr=p=>p.price==null?Infinity:p.price;
+  shown.sort((a,b)=>sort==='price-asc'?pr(a.p)-pr(b.p):sort==='price-desc'?(b.p.price??-1)-(a.p.price??-1):sort==='brand'?a.p.brand.localeCompare(b.p.brand)||a.p.name.localeCompare(b.p.name):a.p.name.localeCompare(b.p.name));
+  const b=cur().parts;
+  $('#dlist').innerHTML=shown.length?shown.map(({p,iss})=>{
+    const lv=iss.length?lvName(worst(iss)):(CATS.filter(c=>c.id!==p.cat&&b[c.id]).length?'compatible':'unknown');
+    const on=b[p.cat]===p.id;
+    return`<div class="card ${on?'on':''}"><div class="h"><div><small class="muted">${CAT[p.cat].label} · ${esc(p.brand)}</small><br><b>${esc(p.name)}</b></div><div style="text-align:right">${priceHTML(p)}</div></div>
+    <div class="spec">${specRows(p).filter(r=>r[1]!=null).slice(0,5).map(r=>`<span>${r[0]}: ${esc(r[1])}</span>`).join('')}</div>
+    ${iss.length?iss.map(i=>`<div class="issue ${i.level}" style="padding:5px 8px"><b>${esc(i.title)}</b><small>${esc(i.reason)}</small></div>`).join(''):''}
+    <div class="act"><span class="badge b-${lv}" title="Compatibility with your current selection">${lv==='compatible'?'fits build':lv}</span><span class="sp"></span>
+      <button data-exp="${p.id}">${expanded.has(p.id)?'Hide':'Details'}</button>
+      ${on?`<button data-rm="${p.cat}">Remove</button>`:`<button class="pri" data-pick="${p.id}">Select</button>`}</div>
+    ${expanded.has(p.id)?`<table class="sp2">${specRows(p).map(([l,v])=>`<tr><td>${l}</td><td class="${v==null?'na':''}">${v==null?'unknown':esc(v)}</td></tr>`).join('')}<tr><td>Source</td><td>${esc(p.source)} · ${esc(p.updated)}</td></tr><tr><td>3D preview</td><td>Generic placeholder</td></tr></table>`:''}</div>`}).join('')
+    :`<div class="empty">No parts match. Try clearing filters.</div>`;
+}
+
+/* ---------------- dialogs / toast ---------------- */
+let toastT;function toast(m,t=''){const e=$('#toast');e.textContent=m;e.className='show '+t;clearTimeout(toastT);toastT=setTimeout(()=>e.className='',2600)}
+const dlg=$('#dlg');
+function openDlg(h){dlg.innerHTML=h;dlg.showModal?dlg.showModal():dlg.setAttribute('open','')}
+dlg.addEventListener('click',e=>{if(e.target===dlg||e.target.closest('[data-close]'))dlg.close()});
+
+const PRESETS={gaming:{case:'cs-m1',mobo:'mb-a1',cpu:'cpu-n7',ram:'ram-5-32',gpu:'gpu-m',cooler:'cl-a360',psu:'psu-750',storage:'ssd-2'},
+ ent:{case:'cs-m1',mobo:'mb-h1',cpu:'cpu-h7',ram:'ram-5-64',gpu:'gpu-x',cooler:'cl-a360',psu:'psu-1000',storage:'ssd-2'},
+ mini:{case:'cs-c1',mobo:'mb-i1',cpu:'cpu-n5',ram:'ram-5-32',gpu:'gpu-s',cooler:'cl-lp',psu:'psu-sfx',storage:'ssd-1'}};
+
+function newBuild(name='Untitled Build',parts={}){const b={id:uid(),name,parts,updated:Date.now()};store.builds.unshift(b);store.current=b.id;hist=[];fut=[];sel=null;persist();refresh();return b}
+function exportBuild(){
+  const b=cur();const data={schema:'pcforge.build',version:1,name:b.name,exported:new Date().toISOString(),parts:b.parts,note:'Part IDs refer to the PCForge catalog (demo or imported).'};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download=(b.name.replace(/[^\w-]+/g,'_')||'build')+'.pcforge.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('Exported build file','good');
+}
+function validateBuild(d){
+  if(!d||typeof d!=='object')throw Error('File is not a valid build object.');
+  if(d.schema!=='pcforge.build')throw Error('Not a PCForge build file.');
+  if(typeof d.version!=='number')throw Error('Missing schema version.');
+  if(d.version>1)throw Error('This file was made by a newer PCForge (schema v'+d.version+').');
+  if(!d.parts||typeof d.parts!=='object')throw Error('Missing parts.');
+  const parts={},skipped=[];
+  for(const[k,v]of Object.entries(d.parts)){if(CAT[k]&&byId[v]&&byId[v].cat===k)parts[k]=v;else skipped.push(k+':'+v)}
+  return{name:String(d.name||'Imported build').slice(0,60),parts,skipped};
+}
+function shareURL(){
+  const b=cur();const payload=btoa(unescape(encodeURIComponent(JSON.stringify({v:1,n:b.name,p:b.parts}))));
+  const url=location.href.split('#')[0]+'#b='+payload;return{url,ok:url.length<1900};
+}
+function loadFromHash(){
+  const m=location.hash.match(/^#b=(.+)$/);if(!m)return;
+  try{const d=JSON.parse(decodeURIComponent(escape(atob(m[1]))));if(d.v!==1)throw Error('Unsupported share version');
+    const v=validateBuild({schema:'pcforge.build',version:1,name:d.n,parts:d.p});newBuild(v.name+' (shared)',v.parts);toast('Opened shared build','good')}
+  catch(e){toast('Invalid share link: '+e.message,'err')}
+  history.replaceState(null,'',location.pathname+location.search);
+}
+function buildsDialog(){
+  openDlg(`<h2>Saved builds</h2><div id="bl">${store.builds.map(b=>{const t=total(b.parts);const n=CATS.filter(c=>b.parts[c.id]).length;
+   return`<div class="slot ${b.id===store.current?'sel':''}" style="cursor:default"><div class="tx"><b>${esc(b.name)}</b><small>${n}/${CATS.length} parts · ${fmt(t.sum,t.cc)}${t.missing.length?' (incomplete)':''} · ${new Date(b.updated).toLocaleDateString()}</small></div>
+   <button data-bo="${b.id}">Open</button><button data-bd="${b.id}">Duplicate</button>${b.id!==store.current?`<button data-bc="${b.id}">Compare</button>`:''}<button data-bx="${b.id}" ${store.builds.length<2?'disabled':''} aria-label="Delete">🗑</button></div>`}).join('')}</div>
+   <div class="foot"><button data-close>Close</button></div>`);
+}
+function compareDialog(id){
+  const a=cur(),o=store.builds.find(b=>b.id===id),ta=total(a.parts),to=total(o.parts);
+  const cell=(b,c)=>{const p=byId[b.parts[c]];return p?`${esc(p.name)}<br><span class="muted">${p.price==null?'n/a':fmt(p.price,p.currency)}</span>`:'<span class="muted">—</span>'};
+  openDlg(`<h2>Compare builds</h2><table class="cmp"><tr><th></th><th>${esc(a.name)} (current)</th><th>${esc(o.name)}</th></tr>
+  ${CATS.map(c=>`<tr class="${a.parts[c.id]!==o.parts[c.id]?'diff':''}"><td class="muted">${c.label}</td><td>${cell(a,c.id)}</td><td>${cell(o,c.id)}</td></tr>`).join('')}
+  <tr><td class="muted">Known total</td><td><b>${fmt(ta.sum,ta.cc)}</b>${ta.missing.length?' +?':''}</td><td><b>${fmt(to.sum,to.cc)}</b>${to.missing.length?' +?':''}</td></tr>
+  <tr><td class="muted">Issues</td><td>${analyze(a.parts).filter(i=>i.level==='incompatible'||i.level==='warning').length}</td><td>${analyze(o.parts).filter(i=>i.level==='incompatible'||i.level==='warning').length}</td></tr></table>
+  <div class="foot"><button data-bl>Back</button><button data-close>Close</button></div>`);
+}
+function settingsDialog(){
+  const cur_=[...new Set(['USD',...catalog.map(p=>p.currency)])];
+  openDlg(`<h2>Settings</h2>
+  <p><label><input type="checkbox" id="sPerf" ${LOW()?'checked':''}> Low-performance mode (no bloom/shadows, pixel ratio 1) — for integrated GPUs &amp; phones</label></p>
+  <p>Display currency <select id="sCur">${cur_.map(c=>`<option ${c===O.currency?'selected':''}>${c}</option>`).join('')}</select> <span class="muted">Parts in other currencies are excluded from totals — no exchange rates are invented.</span></p>
+  <h3>Catalog</h3><p class="muted">The built-in catalog is <b>demo data</b> (fictional brands, placeholder prices). Import your own products as a JSON array. Required fields: <code>id, cat, name, brand</code>; <code>cat</code> is one of ${CATS.map(c=>c.id).join(', ')}. Add specs using the same field names as the demo records (e.g. <code>socket, tdp, length</code>), plus <code>price, currency, source, updated</code> (and <code>url</code> for a verified source).</p>
+  <textarea id="cat" placeholder='[{"id":"my-cpu","cat":"cpu","name":"…","brand":"…","price":199,"currency":"USD","source":"My shop","updated":"2026-10-01","socket":"AM5","tdp":65,"mem":["DDR5"]}]'></textarea>
+  <div class="foot"><button id="sImport">Import catalog</button><button id="sClear" ${store.custom.length?'':'disabled'}>Remove imported (${store.custom.length})</button><button class="pri" data-close>Done</button></div>
+  <p class="muted" style="font-size:11px">Live pricing needs a backend or API (a static page can’t hold private keys). This app works fully offline with demo/imported data. Builds are stored in this browser’s localStorage only.</p>`);
+  $('#sPerf').onchange=e=>{O.perf=e.target.checked;O.perfUser=true;persist();applyOpts();resize3D()};
+  $('#sCur').onchange=e=>{O.currency=e.target.value;persist();refresh()};
+  $('#sClear').onclick=()=>{store.custom=[];rebuildCatalog();for(const b of store.builds)for(const k of Object.keys(b.parts))if(!byId[b.parts[k]])delete b.parts[k];persist();refresh();dlg.close();toast('Imported products removed')};
+  $('#sImport').onclick=()=>{
+    try{const arr=JSON.parse($('#cat').value);if(!Array.isArray(arr))throw Error('Expected a JSON array.');
+      const ok=[],errs=[];
+      arr.forEach((r,i)=>{
+        if(!r||typeof r!=='object'||!r.id||!r.name||!r.brand||!CAT[r.cat]){errs.push('#'+(i+1)+': needs id, name, brand and a valid cat');return}
+        if(r.price!=null&&!(typeof r.price==='number'&&r.price>=0)){errs.push('#'+(i+1)+': price must be a non-negative number or null');return}
+        if(byId[r.id]&&byId[r.id].demo){errs.push('#'+(i+1)+': id clashes with a demo part');return}
+        ok.push({currency:'USD',source:'User import',updated:new Date().toISOString().slice(0,10),model:'procedural',...r,demo:false,id:String(r.id)});
+      });
+      if(!ok.length)throw Error(errs.join('; ')||'Nothing to import.');
+      store.custom=[...store.custom.filter(c=>!ok.find(o=>o.id===c.id)),...ok];rebuildCatalog();persist();refresh();dlg.close();
+      toast(`Imported ${ok.length} product(s)${errs.length?` · ${errs.length} skipped`:''}`,'good');
+    }catch(e){toast('Import failed: '+e.message,'err')}};
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click',e=>{
+  const t=e.target.closest('button,[data-slot]');if(!t)return;
+  if(t.dataset.preset){setParts({...PRESETS[t.dataset.preset]});return}
+  if(t.dataset.rm){e.stopPropagation();setPart(t.dataset.rm,null);return}
+  if(t.dataset.pick){const p=byId[t.dataset.pick];setPart(p.cat,p.id);sel=p.cat;focusCat(p.cat);if(drawerCat===null){}closeDrawer();return}
+  if(t.dataset.exp){expanded.has(t.dataset.exp)?expanded.delete(t.dataset.exp):expanded.add(t.dataset.exp);renderDrawer();return}
+  if(t.dataset.swap){const p=byId[t.dataset.swap];setPart(p.cat,p.id);return}
+  if(t.dataset.change){openDrawer(t.dataset.change);return}
+  if(t.dataset.bo){store.current=t.dataset.bo;hist=[];fut=[];sel=null;persist();refresh();dlg.close();return}
+  if(t.dataset.bd){const b=store.builds.find(x=>x.id===t.dataset.bd);newBuild(b.name+' (copy)',{...b.parts});buildsDialog();return}
+  if(t.dataset.bx){if(store.builds.length<2)return;if(!confirm('Delete this build?'))return;store.builds=store.builds.filter(x=>x.id!==t.dataset.bx);if(store.current===t.dataset.bx)store.current=store.builds[0].id;persist();refresh();buildsDialog();return}
+  if(t.dataset.bc){compareDialog(t.dataset.bc);return}
+  if(t.dataset.bl!==undefined){buildsDialog();return}
+  if(t.id==='dx'){sel=null;renderPanel();renderDetail();return}
+  if(t.dataset.slot){const c=t.dataset.slot;sel=c;if(byId[cur().parts[c]]){focusCat(c);refresh()}else{refresh();openDrawer(c)}return}
+});
+document.addEventListener('keydown',e=>{
+  const s=e.target.closest?.('[data-slot]');if(s&&(e.key==='Enter'||e.key===' ')){e.preventDefault();s.click();return}
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+  if(e.key==='Escape'){closeDrawer();return}
+  if(document.activeElement===$('#gl')||document.activeElement===document.body){
+    const k=e.key.toLowerCase();if(k==='r')viewPreset('three');if(k==='e')setOpt('explode');if(k==='f')toggleFS();}
+});
+$('#dclose').onclick=closeDrawer;
+['input','change'].forEach(ev=>{$('#dq').addEventListener(ev,renderDrawer);$('#dsort').addEventListener(ev,renderDrawer);$('#dbrand').addEventListener(ev,renderDrawer);$('#dcompat').addEventListener(ev,renderDrawer)});
+$('#gsearch').addEventListener('input',e=>{const q=e.target.value;if(q.trim()){drawerCat===null?($('#dq').value=q,renderDrawer()):openDrawer(null,q);}});
+$('#gsearch').addEventListener('keydown',e=>{if(e.key==='Escape'){e.target.value='';closeDrawer()}});
+$('#bname').addEventListener('input',e=>{cur().name=e.target.value.slice(0,60);cur().updated=Date.now();persist()});
+$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
+$('#bNew').onclick=()=>{newBuild();toast('New empty build')};
+$('#bBuilds').onclick=buildsDialog;
+$('#bExport').onclick=exportBuild;
+$('#bSet').onclick=settingsDialog;
+$('#bImport').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{if(f.size>1e6)throw Error('File too large.');const v=validateBuild(JSON.parse(await f.text()));newBuild(v.name,v.parts);toast(v.skipped.length?`Imported · ${v.skipped.length} unknown part(s) skipped`:'Build imported',v.skipped.length?'':'good')}
+  catch(err){toast('Import failed: '+err.message,'err')}};
+$('#bShare').onclick=async()=>{const{url,ok}=shareURL();
+  if(!ok){toast('Build is too large for a link — use Export instead','err');return}
+  try{await navigator.clipboard.writeText(url);toast('Share link copied','good')}catch{openDlg(`<h2>Share link</h2><textarea readonly>${esc(url)}</textarea><div class="foot"><button data-close>Close</button></div>`)}};
+
+/* =====================================================================
+   3D
+   ===================================================================== */
+let THREE,OrbitControls,EffectComposer,RenderPass,UnrealBloomPass,OutputPass,RoomEnvironment;
+const S={ok:false,groups:{},pick:[],fans:[],rgb:[],expl:[],anchor:{},k:0};
+let renderer,scene,camera,controls,composer,bloom,dirL,hemi,ground,grid,envTex,hoverBox,selBox,ray,clock;
+let tween=null,hoverCat=null;
+const BGS=[0x0a0b0e,0x0a1022,0x2a2e37];
+const mmx=v=>v/10;
+
+async function init3D(){
+  const host=$('#gl');
+  try{
+    const mods=await Promise.all([import('three'),import('three/addons/controls/OrbitControls.js'),import('three/addons/postprocessing/EffectComposer.js'),import('three/addons/postprocessing/RenderPass.js'),import('three/addons/postprocessing/UnrealBloomPass.js'),import('three/addons/postprocessing/OutputPass.js'),import('three/addons/environments/RoomEnvironment.js')]);
+    THREE=mods[0];({OrbitControls}=mods[1]);({EffectComposer}=mods[2]);({RenderPass}=mods[3]);({UnrealBloomPass}=mods[4]);({OutputPass}=mods[5]);({RoomEnvironment}=mods[6]);
+  }catch(e){fail3D('Could not download the 3D engine (three.js). Check your internet connection and reload. The builder, prices and compatibility checks still work.');return}
+  try{
+    renderer=new THREE.WebGLRenderer({antialias:LOW(),powerPreference:'high-performance'});
+  }catch(e){fail3D('WebGL is not available in this browser, so the 3D view is disabled. Everything else still works.');return}
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false;
+  host.appendChild(renderer.domElement);
+  scene=new THREE.Scene();clock=new THREE.Clock();
+  camera=new THREE.PerspectiveCamera(38,1,.3,600);
+  controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=4;controls.maxDistance=220;controls.maxPolarAngle=Math.PI*.495;controls.screenSpacePanning=true;controls.autoRotateSpeed=1.2;
+  const pm=new THREE.PMREMGenerator(renderer);envTex=pm.fromScene(new RoomEnvironment(),0.04).texture;
+  hemi=new THREE.HemisphereLight(0xbfd4ff,0x101018,.5);scene.add(hemi);
+  dirL=new THREE.DirectionalLight(0xffffff,2.2);dirL.position.set(40,90,50);dirL.castShadow=true;dirL.shadow.mapSize.set(1024,1024);
+  Object.assign(dirL.shadow.camera,{left:-70,right:70,top:70,bottom:-70,near:10,far:260});dirL.shadow.bias=-.0004;scene.add(dirL);
+  const rim=new THREE.PointLight(0x8b5cf6,1800,200);rim.position.set(-40,30,-50);scene.add(rim);
+  ground=new THREE.Mesh(new THREE.CircleGeometry(140,64),new THREE.MeshStandardMaterial({color:0x14161b,roughness:.55,metalness:.3}));
+  ground.rotation.x=-Math.PI/2;ground.position.y=-.05;ground.receiveShadow=true;scene.add(ground);
+  grid=new THREE.GridHelper(280,56,0x2c3440,0x1a1f27);grid.position.y=0;scene.add(grid);
+  hoverBox=new THREE.Box3Helper(new THREE.Box3(),0xffffff);selBox=new THREE.Box3Helper(new THREE.Box3(),0x5eead4);
+  hoverBox.visible=selBox.visible=false;scene.add(hoverBox,selBox);
+  ray=new THREE.Raycaster();
+  const comp=()=>{
+    composer=new EffectComposer(renderer,new THREE.WebGLRenderTarget(4,4,{type:THREE.HalfFloatType,samples:LOW()?0:2}));
+    composer.addPass(new RenderPass(scene,camera));
+    bloom=new UnrealBloomPass(new THREE.Vector2(256,256),.55,.6,.9);composer.addPass(bloom);composer.addPass(new OutputPass());
+  };comp();
+  // pointer interaction
+  const el=renderer.domElement;let down=null;
+  el.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};tween=null});
+  el.addEventListener('pointerup',e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>5)return;
+    const c=pickAt(e);if(c){sel=c;focusCat(c);refresh()}else if(sel){sel=null;refresh()}});
+  let hpend=false;el.addEventListener('pointermove',e=>{if(down||e.pointerType==='touch'||hpend)return;hpend=true;setTimeout(()=>hpend=false,60);const c=pickAt(e);hoverCat=c;el.style.cursor=c?'pointer':'grab';
+    const tip=$('#tip');if(c){const p=byId[cur().parts[c]];tip.style.display='block';const r=$('#view').getBoundingClientRect();tip.style.left=(e.clientX-r.left+14)+'px';tip.style.top=(e.clientY-r.top+14)+'px';tip.textContent=CAT[c].label+(p?' · '+p.name:'')}else tip.style.display='none'});
+  el.addEventListener('pointerleave',()=>{hoverCat=null;$('#tip').style.display='none'});
+  new ResizeObserver(resize3D).observe($('#view'));
+  el.addEventListener('webglcontextlost',e=>{e.preventDefault();fail3D('The graphics context was lost. Reload the page to restore the 3D view.')});
+  S.ok=true;applyOpts();build3D();viewPreset('three',true);resize3D();
+  $('#loading').remove();
+  renderer.setAnimationLoop(loop);
+}
+function fail3D(msg){const l=$('#loading');if(l){l.classList.add('failed');l.innerHTML=`<div style="max-width:380px"><div style="font-size:30px">⚠</div><p>${esc(msg)}</p></div>`}S.ok=false;if(renderer)renderer.setAnimationLoop(null)}
+function resize3D(){
+  if(!S.ok)return;const v=$('#view'),w=v.clientWidth,h=v.clientHeight;if(!w||!h)return;
+  const pr=LOW()?Math.min(devicePixelRatio,1.25):Math.min(devicePixelRatio,1.75);
+  const rk=w+'x'+h+'@'+pr;if(rk===S.rk)return;S.rk=rk;
+  renderer.setPixelRatio(pr);renderer.setSize(w,h,false);composer.setPixelRatio(pr);composer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();
+}
+function pickAt(e){
+  if(!S.ok)return null;const r=renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-((e.clientY-r.top)/r.height)*2+1},camera);
+  const hit=ray.intersectObjects(S.pick,false)[0];return hit?hit.object.userData.cat:null;
+}
+function catBox(cat){const b=new THREE.Box3();for(const m of S.pick)if(m.userData.cat===cat)b.expandByObject(m);return b}
+function focusCat(cat){
+  if(!S.ok)return;const b=catBox(cat);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3());
+  const dist=THREE.MathUtils.clamp(Math.max(s.x,s.y,s.z)*2.1,38,110);
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  tweenTo(c,c.clone().addScaledVector(dir,dist));
+}
+function tweenTo(target,pos,dur=.8){tween={t:0,dur,fromT:controls.target.clone(),fromP:camera.position.clone(),toT:target.clone(),toP:pos.clone()}}
+const DIRS={three:[1,.5,1.1],front:[0,.12,1],side:[1,.12,0],rear:[0,.12,-1],top:[.001,1,.001]};
+function viewPreset(k,instant){
+  if(!S.ok)return;const d=new THREE.Vector3(...DIRS[k]).normalize();const H=S.dims?S.dims[1]:48,D=S.dims?S.dims[2]:46;
+  const dist=Math.max(H*1.55,D*1.35)*(V.explode?1.35:1)*(k==='top'?1.05:1);
+  const tg=new THREE.Vector3(0,H*.5,0),pos=tg.clone().addScaledVector(d,dist);
+  if(instant){controls.target.copy(tg);camera.position.copy(pos);controls.update()}else tweenTo(tg,pos);
+}
+
+/* ---- options ---- */
+const TOGGLES=[['explode','Explode'],['glass','Glass panel'],['shell','Front/top'],['rgb','RGB'],['grid','Grid'],['shadows','Shadows'],['labels','Labels'],['env','Reflections'],['spin','Fan spin'],['autorot','Auto-orbit']];
+const PRES=[['three','3/4'],['front','Front'],['side','Side'],['rear','Rear'],['top','Top']];
+function renderToolbar(){
+  $('#tbTop').innerHTML=PRES.map(([k,l])=>`<button class="chip" data-view="${k}">${l}</button>`).join('')+'<button class="chip" id="ltb" aria-label="Lighting">☀</button><button class="chip" id="pan" title="Right-drag or two-finger drag to pan">Reset</button><span style="width:8px"></span>'+TOGGLES.map(([k,l])=>`<button class="chip" data-opt="${k}" aria-pressed="${k==='explode'?V.explode:!!O[k]}">${l}</button>`).join('');
+  $('#tbTop').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.view)viewPreset(b.dataset.view);else if(b.dataset.opt)setOpt(b.dataset.opt);else if(b.id==='pan')viewPreset('three');else if(b.id==='ltb')$('#tbBot').classList.toggle('open')};
+}
+function setOpt(k){if(k==='explode'){V.explode=!V.explode;if(S.ok){const f=V.explode?1.3:1/1.3;const d=camera.position.clone().sub(controls.target);tweenTo(controls.target,controls.target.clone().addScaledVector(d,f),.9)}}else{O[k]=!O[k];persist()}renderToolbar();applyOpts()}
+function applyOpts(){
+  if(!S.ok)return;
+  grid.visible=ground.visible=!!O.grid;
+  const sh=O.shadows&&!LOW();renderer.shadowMap.enabled=sh;dirL.castShadow=sh;S.shadowDirty=true;
+  scene.environment=O.env?envTex:null;
+  scene.background=new THREE.Color(BGS[O.bg]);scene.fog=new THREE.Fog(BGS[O.bg],160,320);
+  $('#view').style.background=`radial-gradient(900px 500px at 50% 30%,${['#171b24','#142044','#3a404c'][O.bg]},${'#'+BGS[O.bg].toString(16).padStart(6,'0')})`;
+  dirL.intensity=2.2*O.light;hemi.intensity=.5*O.light;renderer.toneMappingExposure=.85+.15*O.light;
+  controls.autoRotate=!!O.autorot;
+  bloom.enabled=!LOW();bloom.strength=.45+.25*(O.light>1?1:0);
+  $('#labels').style.display=O.labels?'':'none';
+  for(const g of S.glass||[])g.visible=!!O.glass;
+  for(const g of S.shell||[])g.visible=!!O.shell;
+  $('#light').value=O.light;$('#rgbc').value=O.rgbc;$('#rainbow').setAttribute('aria-pressed',O.rainbow);
+  document.querySelectorAll('.sw').forEach(s=>s.setAttribute('aria-pressed',+s.dataset.bg===O.bg));
+  resize3D();
+}
+$('#light').oninput=e=>{O.light=+e.target.value;persist();applyOpts()};
+$('#rgbc').oninput=e=>{O.rgbc=e.target.value;O.rainbow=false;persist();applyOpts()};
+$('#rainbow').onclick=()=>{O.rainbow=!O.rainbow;persist();applyOpts()};
+document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>{O.bg=+s.dataset.bg;persist();applyOpts()});
+function toggleFS(){const v=$('#view');document.fullscreenElement?document.exitFullscreen():v.requestFullscreen?.().catch(()=>toast('Fullscreen not available','err'))}
+$('#fs').onclick=toggleFS;
+document.addEventListener('fullscreenchange',()=>setTimeout(resize3D,100));
+
+/* ---- scene construction ---- */
+function disposeTree(o){o.traverse(n=>{n.geometry?.dispose();const m=n.material;if(m)(Array.isArray(m)?m:[m]).forEach(x=>{for(const k in x)x[k]?.isTexture&&x[k].dispose();x.dispose()})});o.parent?.remove(o)}
+function build3D(){
+  if(!S.ok)return;
+  const sig=JSON.stringify(cur().parts)+'|'+store.current+'|'+JSON.stringify(Object.values(cur().parts).map(i=>byId[i]));
+  if(sig===S.sig&&S.root)return;S.sig=sig;S.shadowDirty=true;
+  if(S.root)disposeTree(S.root);
+  S.root=new THREE.Group();scene.add(S.root);
+  Object.assign(S,{groups:{},pick:[],fans:[],rgb:[],expl:[],anchor:{},glass:[],shell:[]});
+  $('#labels').innerHTML='';
+  const Pt=c=>byId[cur().parts[c]];
+  const mat=(c,o={})=>new THREE.MeshStandardMaterial({color:c,metalness:.55,roughness:.42,...o});
+  const box=(w,h,d,m,x,y,z,par)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;par.add(o);return o};
+  const cyl=(r,h,m,x,y,z,par,seg=24)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg),m);o.position.set(x,y,z);o.castShadow=true;par.add(o);return o};
+  let ri=0;
+  const rgbMat=()=>{const m=new THREE.MeshStandardMaterial({color:0x050607,emissive:new THREE.Color(O.rgbc),emissiveIntensity:O.rgb?2.4:0,roughness:.4});m.userData.off=(ri++)*.13;S.rgb.push(m);return m};
+  const reg=(cat,g,expl,{pick=true,glass=false,shell=false}={})=>{
+    g.userData.cat=cat;S.root.add(g);(S.groups[cat]=S.groups[cat]||[]).push(g);
+    S.expl.push({g,v:new THREE.Vector3(...expl)});
+    if(glass)S.glass.push(g);if(shell)S.shell.push(g);
+    if(pick)g.traverse(n=>{if(n.isMesh){n.userData.cat=cat;S.pick.push(n)}});
+    return g};
+  const mFan=mat(0x15171b,{metalness:.3,roughness:.6}),mBl=mat(0x2a2d34,{metalness:.2,roughness:.5});
+  const fan=(size,orient,x,y,z,par,fixedRgb)=>{
+    const g=new THREE.Group();
+    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([a,b])=>box(a?.7:size,b?.7:size,2.5,mFan,a*(size/2-.35),b*(size/2-.35),0,g));
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(size*.44,.28,8,40),fixedRgb||rgbMat());g.add(ring);
+    const bl=new THREE.Group();for(let i=0;i<7;i++){const a=i/7*Math.PI*2;const m=new THREE.Mesh(new THREE.BoxGeometry(size*.3,size*.11,.12),mBl);m.position.set(Math.cos(a)*size*.22,Math.sin(a)*size*.22,0);m.rotation.set(.5,0,a);bl.add(m)}
+    {const hub=new THREE.Mesh(new THREE.CylinderGeometry(size*.11,size*.11,.8,20),mFan);hub.rotation.x=Math.PI/2;bl.add(hub)}
+    g.add(bl);S.fans.push(bl);
+    if(orient==='y')g.rotation.x=Math.PI/2;if(orient==='x')g.rotation.y=Math.PI/2;
+    g.position.set(x,y,z);par.add(g);return g};
+
+  /* ---- detail kit: printed labels, logos, spec stickers ---- */
+  const BR={Nova:'#5eead4',Helix:'#60a5fa',Arc:'#f59e0b',Vertex:'#22c55e',Aero:'#e5e7eb',Tide:'#38bdf8',Monolith:'#f97316',Pillar:'#cbd5e1',Forge:'#ef4444',Quill:'#a78bfa'};
+  const bc=p=>BR[p?.brand]||'#5eead4',sub=p=>p.name.replace(p.brand,'').trim();
+  const tx=(w,h,fn)=>{const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t};
+  const tw=(q,s,x,y,sz,c='#fff',al='center',wt=700)=>{q.font=`${wt} ${sz}px system-ui,Arial,sans-serif`;q.fillStyle=c;q.textAlign=al;q.textBaseline='middle';q.fillText(s,x,y)};
+  const logo=(q,x,y,r,c,b='N')=>{const n=3+[...b].reduce((a,ch)=>a+ch.charCodeAt(0),0)%4;q.beginPath();for(let i=0;i<n;i++){const a=i/n*Math.PI*2-Math.PI/2;q[i?'lineTo':'moveTo'](x+Math.cos(a)*r,y+Math.sin(a)*r)}q.closePath();q.lineWidth=r*.2;q.strokeStyle=c;q.stroke();q.globalAlpha=.25;q.fillStyle=c;q.fill();q.globalAlpha=1;tw(q,b[0],x,y+r*.06,r*1.05,c,'center',900)};
+  const dec=(w,h,t,x,y,z,par,rz=0,glow=.5,ry=Math.PI/2)=>{const gp=new THREE.Group();gp.position.set(x,y,z);gp.rotation.y=ry;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:t,transparent:true,roughness:.45,metalness:.1,emissive:0xffffff,emissiveMap:t,emissiveIntensity:glow}));m.rotation.z=rz;gp.add(m);par.add(gp)};
+  const gold=mat(0xc9a24a,{metalness:.9,roughness:.3}),blk=mat(0x0b0c0f),sil=mat(0xb8bec8,{metalness:.9,roughness:.25}),wht=mat(0xe8e4d8,{metalness:.1,roughness:.7});
+  S.gpuPwr=null;
+
+  /* case ------------------------------------------------ */
+  const cs=Pt('case');const dims=cs?cs.dims.map(mmx):[23,48,46];const[W,H,D]=dims;S.dims=dims;
+  const cCol=cs?cs.color:0x2a2d34,light=cs&&cs.color>0xaaaaaa;
+  const mCase=mat(cCol,{metalness:.5,roughness:light?.35:.5}),mDark=mat(light?0x9aa0ab:0x111317,{metalness:.4,roughness:.6});
+  const frame=new THREE.Group();
+  if(cs){
+    box(W,.8,D,mCase,0,.4,0,frame);
+    box(.5,H,D,mCase,-W/2+.25,H/2,0,frame);
+    box(W,H,.5,mDark,0,H/2,-D/2+.25,frame);
+    for(const sx of[-1,1])for(const sz of[-1,1])box(1.1,H,1.1,mCase,sx*(W/2-.55),H/2,sz*(D/2-.55),frame);
+    reg('case',frame,[0,0,0]);
+    const roof=new THREE.Group();box(W,.8,D,mCase,0,H-.4,0,roof);
+    // vent slots on roof
+    for(let i=-4;i<=4;i++)box(W*.5,.9,.5,mDark,0,H-.4,i*3.2,roof);
+    reg('case',roof,[0,16,0],{shell:true});
+    const front=new THREE.Group();
+    if(cs.style==='solid'){box(W-.6,H-1.8,.8,mCase,0,H/2,D/2+.4,front);box(.3,H-6,.3,rgbMat(),0,H/2,D/2+.9,front)}
+    else{box(W,2,.8,mCase,0,H-1,D/2+.4,front);box(W,2,.8,mCase,0,1.6,D/2+.4,front);box(1.6,H,.8,mCase,-W/2+.8,H/2,D/2+.4,front);box(1.6,H,.8,mCase,W/2-.8,H/2,D/2+.4,front);
+      for(let i=0;i<12;i++)box(W-3,.5,.5,mDark,0,3.4+i*(H-7)/11,D/2+.45,front)}
+    reg('case',front,[0,0,18],{shell:true});
+    const glass=new THREE.Group();
+    const gm=new THREE.MeshPhysicalMaterial({color:0x9db4d0,transparent:true,opacity:.16,roughness:.04,metalness:0,clearcoat:1,side:THREE.DoubleSide,depthWrite:false});
+    glass.add(new THREE.Mesh(new THREE.BoxGeometry(.3,H-1,D-1),gm));glass.children[0].position.set(W/2,H/2,0);
+    [[0,1],[0,-1]].forEach(([_,s])=>box(.5,.5,D,mDark,W/2,H/2+s*(H/2-.5),0,glass));
+    {const post=new THREE.Mesh(new THREE.BoxGeometry(.5,H,.5),mDark);post.position.set(W/2,H/2,D/2-.25);glass.add(post)}
+    {const post=new THREE.Mesh(new THREE.BoxGeometry(.5,H,.5),mDark);post.position.set(W/2,H/2,-D/2+.25);glass.add(post)}
+    dec(14,2.4,tx(560,96,(q,w,h)=>{logo(q,40,h/2,26,bc(cs),cs.brand);tw(q,cs.brand.toUpperCase(),90,h/2+2,44,'#cfd6e2','left',800);tw(q,sub(cs),w-20,h/2+2,28,bc(cs),'right',600)}),W/2+.2,H*.13,-D/2+12,glass,0,.45);
+    reg('case',glass,[24,0,0],{glass:true,pick:false});
+    // case fans
+    const f=cs.fans||{},ytop=H-2.5;
+    const ffan=new THREE.Group();for(let i=0;i<(f.front||0);i++)fan(12,'z',-W/2+8,ytop-6-i*12,D/2-1.8,ffan);
+    if(f.front)reg('case',ffan,[0,0,10]);
+    const rfan=new THREE.Group();for(let i=0;i<(f.rear||0);i++)fan(12,'z',-W/2+7.6,ytop-7,-D/2+1.9,rfan);
+    if(f.rear)reg('case',rfan,[0,0,-14]);
+  }else{ // ghost outline when no case chosen
+    const eg=new THREE.EdgesGeometry(new THREE.BoxGeometry(W,H,D));const l=new THREE.LineSegments(eg,new THREE.LineBasicMaterial({color:0x5eead4,transparent:true,opacity:.35}));l.position.set(0,H/2,0);frame.add(l);
+    box(W,.4,D,mat(0x1a1d24),0,.2,0,frame);S.root.add(frame);
+  }
+  S.anchor.case=new THREE.Vector3(0,H+2,0);
+
+  /* motherboard ----------------------------------------- */
+  const mb=Pt('mobo');const FF={ATX:[305,244],mATX:[244,244],ITX:[170,170]};
+  const ff=mb?FF[mb.form]||FF.ATX:FF.ATX;const len=ff[0]/10,ht=ff[1]/10;
+  const bx=-W/2+.5+1.2+.09,zs=-D/2+4.2,ytop=H-3;
+  const O3=new THREE.Vector3(bx,ytop-ht/2,zs+len/2);
+  const L=(x,y,z)=>new THREE.Vector3(O3.x+x,O3.y+y,O3.z+z);
+  const sockL={x:.25,y:ht*.08,z:-len*.14};
+  const ramBot=ht/2-1.2-13.3;const gpuTop=Math.min(-3.2,ramBot+6.65-6.65-.3);
+  if(mb){
+    const g=new THREE.Group();const pcb=mat(mb.chipset&&/X|Z/.test(mb.chipset)?0x16181d:0x1b1e26,{metalness:.3,roughness:.6}),hs=mat(0x383d47,{metalness:.8,roughness:.3}),acc=rgbMat();
+    box(.18,ht,len,pcb,O3.x,O3.y,O3.z,g);
+    const lb=(w,h,d,m,x,y,z)=>box(w,h,d,m,O3.x+x,O3.y+y,O3.z+z,g);
+    lb(3.2,ht*.42,len*.17,hs,1.7,ht/2-ht*.21,-len/2+len*.085);      // I/O shroud
+    lb(2,2,len*.22,hs,1.1,ht/2-1.2,-len*.28+len*.05);               // VRM top
+    lb(2,ht*.3,2.4,hs,1.1,ht/2-ht*.17,-len*.2);                     // VRM side
+    lb(.7,.2,len*.17,acc,2.15,ht/2-1.2,-len*.28+len*.05);           // accent strip
+    lb(1.3,5,5,hs,.75,-ht*.28,len*.12);                             // chipset
+    lb(.2,5,5,acc,1.45,-ht*.28,len*.12);
+    for(let i=0;i<(mb.ramSlots||4);i++)lb(.8,13.3,.36,mat(0x0b0c0f),.5,ht/2-1.2-6.65,len*.0+7+i*1.0+ -3.7+3.7);  // DIMM slots
+    lb(1,.5,9,mat(0x0b0c0f),.6,gpuTop+.3,0);                         // PCIe slot hint
+    lb(.7,4.2,4.2,mat(0x9aa0aa,{metalness:.9,roughness:.25}),.25,sockL.y,sockL.z); // socket
+    const c=bc(mb),rnd=(sd=>()=>(sd=(sd*16807)%2147483647)/2147483647)(mb.name.length*977+7);
+    dec(len,ht,tx(1536,Math.round(1536*ht/len),(q,w,h)=>{
+      q.strokeStyle='rgba(120,200,170,.22)';q.lineWidth=2;
+      for(let i=0;i<70;i++){let x=rnd()*w,y=rnd()*h;q.beginPath();q.moveTo(x,y);for(let k=0;k<4;k++){x+=(rnd()-.5)*220;y+=(rnd()-.5)*220;q.lineTo(x,y)}q.stroke()}
+      const X=z=>(.5-z/len)*w,Y=y=>(.5-y/ht)*h;
+      logo(q,X(len*.4),Y(-ht*.43),h*.032,c,mb.brand);
+      tw(q,(mb.brand+' '+sub(mb)).toUpperCase(),X(len*.17),Y(-ht*.43),h*.04,'#e5e9f0','center',800);
+      tw(q,`${mb.socket} · ${mb.chipset} · ${mb.memType} · ${mb.ramSlots}×DIMM · ${mb.m2}×M.2 · ${mb.sata}×SATA`,X(-len*.17),Y(-ht*.43),h*.017,'#aab3c2','center',600);
+      [['CPU_FAN',-len*.3,ht*.39],['EATX12V',-len*.03,ht*.47],['ATX_PWR',len*.44,ht*.1],['SATA',len*.43,-ht*.1],['CMOS',len*.3,-ht*.22],[mb.memType+' · MAX '+mb.maxRam+'GB',8.5,ht/2-.5],['PCIe x16',len*.1,gpuTop+1.6]].forEach(([t,z,y])=>tw(q,t,X(z),Y(y),h*.014,'#8b93a3','center',600))
+    }),O3.x+.1,O3.y,O3.z,g,0,.25);
+    for(let i=0;i<16;i++)lb(.55,1.7,.1,hs,2.25,ht/2-1.2,-len*.34+i*len*.22/15);          // VRM fins (top)
+    for(let i=0;i<14;i++)lb(.55,.1,2.4,hs,2.25,ht/2-ht*.32+i*ht*.3/13,-len*.2);            // VRM fins (side)
+    for(let i=0;i<8;i++){cyl(.42,.8,mat(0x2b2f38,{metalness:.7,roughness:.35}),O3.x+.5,O3.y+sockL.y-2.8+i*.8,O3.z+sockL.z-3.1,g,14).rotation.z=Math.PI/2;cyl(.4,.7,gold,O3.x+.5,O3.y+sockL.y+3.2,O3.z+sockL.z-2.8+i*.8,g,14).rotation.z=Math.PI/2}  // chokes + caps
+    lb(.5,.3,5,sil,.45,sockL.y+2.5,sockL.z);lb(.5,.3,5,sil,.45,sockL.y-2.5,sockL.z);lb(.5,5,.3,sil,.45,sockL.y,sockL.z+2.5);lb(.5,5,.3,sil,.45,sockL.y,sockL.z-2.5); // CPU socket frame
+    for(let i=0;i<(mb.ramSlots||4);i++)lb(.55,.7,.36,wht,.8,ht/2-1.2-13.3,7+i);             // DIMM latches
+    lb(1.5,5.2,1.6,wht,.95,0,len/2-.9);lb(.1,4.6,1.2,blk,1.72,0,len/2-.9);                  // 24-pin ATX
+    lb(1.4,1.7,3.9,blk,.9,ht/2-.9,-len*.02);                                                // 8-pin EPS
+    for(let i=0;i<Math.min(mb.sata||4,6);i++)lb(.9,.7,1.7,blk,.6,-ht*.2-i*.9,len/2-1);      // SATA ports
+    cyl(1.05,.35,sil,O3.x+.55,O3.y-ht*.15,O3.z+len*.3,g,24).rotation.z=Math.PI/2;          // CMOS battery
+    for(const sy of[-1,1])for(const sz of[-.46,.05,.46])cyl(.35,.2,sil,O3.x+.2,O3.y+sy*(ht/2-.7),O3.z+sz*len,g,10).rotation.z=Math.PI/2; // screws
+    {const p=L(1.43,-ht*.28,len*.12);dec(4.6,4.6,tx(256,256,(q,w)=>{logo(q,w/2,92,48,c,mb.brand);tw(q,mb.chipset.toUpperCase(),w/2,170,34,'#e5e9f0');tw(q,'CHIPSET · '+mb.socket,w/2,215,20,'#aab3c2','center',500)}),p.x,p.y,p.z,g,0,.5)}
+    {const p=L(3.35,ht/2-ht*.21,-len/2+len*.085);dec(len*.17,ht*.42,tx(256,512,(q,w,h)=>{q.save();q.translate(w/2,h/2);q.rotate(-Math.PI/2);logo(q,-150,0,42,c,mb.brand);tw(q,mb.brand.toUpperCase(),30,-30,64,'#e5e9f0','center',900);tw(q,sub(mb).toUpperCase(),30,40,40,c,'center',800);q.restore()}),p.x,p.y,p.z,g,0,.7)}
+    reg('mobo',g,[6,0,0]);
+    S.anchor.mobo=L(1,ht/2,-len*.32);
+  }
+  /* cpu */
+  const cpu=Pt('cpu');
+  if(cpu){const g=new THREE.Group();const p=L(.6,sockL.y,sockL.z);
+    box(.14,4.2,4.2,mat(0x0e3a2a,{metalness:.2,roughness:.6}),p.x-.1,p.y,p.z,g);
+    for(let i=0;i<8;i++){const a=i%4-1.5;box(.12,.3,.2,gold,p.x-.02,p.y+(i<4?2.0:-2.0),p.z+a*.9,g);box(.12,.2,.3,gold,p.x-.02,p.y+a*.9,p.z+(i<4?2.0:-2.0),g)}
+    box(.3,3.5,3.5,mat(0xd5d9e0,{metalness:.95,roughness:.18}),p.x+.1,p.y,p.z,g);
+    box(.05,.5,.5,gold,p.x-.02,p.y-1.9,p.z+1.9,g);
+    dec(3.3,3.3,tx(512,512,(q,w)=>{logo(q,90,92,44,'#3b4150',cpu.brand);tw(q,cpu.brand.toUpperCase(),w*.62,92,56,'#2a2d34','center',900);tw(q,sub(cpu).toUpperCase(),w/2,215,72,'#1d2026');tw(q,cpu.cores+' CORES · '+cpu.threads+' THREADS',w/2,305,34,'#2a2d34');tw(q,cpu.socket+' · '+cpu.tdp+'W · '+cpu.mem.join('/'),w/2,355,34,'#2a2d34');tw(q,'MODEL '+cpu.id.toUpperCase(),w/2,445,26,'#4a5060','center',500)}),p.x+.27,p.y,p.z,g,0,0);
+    reg('cpu',g,[14,0,0]);S.anchor.cpu=p.clone().add(new THREE.Vector3(0,3,0))}
+  /* ram */
+  const ram=Pt('ram');
+  if(ram){const g=new THREE.Group();const n=Math.min(ram.modules||2,mb?.ramSlots||4);const idx=n>=4?[0,1,2,3]:n===2?[1,3]:[1];const c=bc(ram);
+    const hsm=mat(0x30343d,{metalness:.8,roughness:.3});
+    const t=tx(1330,80,(q,w,h)=>{q.fillStyle='#14161b';q.fillRect(0,0,w,h);q.fillStyle=c;q.fillRect(0,0,w,8);logo(q,50,h/2+4,26,c,ram.brand);tw(q,ram.brand.toUpperCase(),100,h/2+4,40,'#fff','left',900);tw(q,ram.memType+'-'+ram.speed+'  CL'+ram.cl,420,h/2+4,40,c,'left',800);tw(q,ram.capacity+'GB KIT · '+ram.modules+'×'+ram.capacity/ram.modules+'GB',w-30,h/2+4,40,'#cfd6e2','right',700)});
+    for(const i of idx.slice(0,n)){const p=L(.5,ht/2-1.2-6.65,7+i*1.0);
+      box(3.3,13.3,.8,hsm,p.x+1.45,p.y,p.z,g);box(.4,13.3,.7,mat(0x0e3a2a),p.x+.1,p.y,p.z,g);
+      for(const dz of[-.37,.37])box(.2,13.3,.08,hsm,p.x+3.2,p.y,p.z+dz,g);
+      for(let k=0;k<9;k++)box(3.3,.12,.82,mat(0x1b1e24),p.x+1.45,p.y-5.6+k*1.4,p.z,g);
+      box(.6,.5,.78,rgbMat(),p.x+2.7,p.y+6.4,p.z,g);
+      dec(13.3,.8,t,p.x+3.13,p.y,p.z,g,Math.PI/2,.45)}
+    reg('ram',g,[16,6,0]);S.anchor.ram=L(2,ht/2-1,7+1.5)}
+  /* cooler */
+  const cl=Pt('cooler');
+  if(cl){const g=new THREE.Group();const c=bc(cl),H0=mmx(cl.height||100),sp=L(.6,sockL.y,sockL.z);const mc=mat(0x23262d,{metalness:.7,roughness:.35}),cu=mat(0xb87333,{metalness:.9,roughness:.3});
+    if(cl.radiator){
+      cyl(3.6,4.4,mc,0,0,0,g).position.copy(sp.clone().add(new THREE.Vector3(2.5,0,0)));g.children.at(-1).rotation.z=Math.PI/2;
+      const ring=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,.3,32),rgbMat());ring.rotation.z=Math.PI/2;ring.position.copy(sp).add(new THREE.Vector3(4.8,0,0));g.add(ring);
+      dec(5,5,tx(256,256,(q,w)=>{logo(q,w/2,100,50,c,cl.brand);tw(q,cl.brand.toUpperCase(),w/2,176,34,'#fff','center',900);tw(q,cl.radiator+'mm AIO',w/2,214,24,c)}),sp.x+5.0,sp.y,sp.z,g,0,.8);
+      const rl=mmx(cl.radiator===360?395:cl.radiator===240?275:(cl.radiator*1.1)),radY=H-1.6-1.35,radX=bx+6.5,radZ=-D/2+3+rl/2+ (cl.radiator===360?0:3);
+      box(12,2.7,rl,mat(0x1d2026,{metalness:.6,roughness:.5}),radX,radY,radZ,g);
+      dec(rl,2.7,tx(Math.round(rl*40),108,(q,w,h)=>{logo(q,60,h/2,34,c,cl.brand);tw(q,cl.brand.toUpperCase()+' '+sub(cl).toUpperCase(),120,h/2+2,48,'#fff','left',900);tw(q,'RADIATOR '+cl.radiator+'mm',w-30,h/2+2,36,c,'right',700)}),radX+6.03,radY,radZ,g,0,.5);
+      const nf=cl.radiator===360?3:cl.radiator===240?2:1;
+      for(let i=0;i<nf;i++)fan(12,'y',radX,radY-2.6,radZ-rl/2+6+i*12.1,g);
+      const mk=(dz)=>{const c=new THREE.CatmullRomCurve3([sp.clone().add(new THREE.Vector3(3,dz*1.2,0)),sp.clone().add(new THREE.Vector3(6,dz*1.4+4,-1)),new THREE.Vector3(radX+dz*2,radY-4,radZ-rl/2-2),new THREE.Vector3(radX+dz*2,radY,radZ-rl/2+1.5)]);const t=new THREE.Mesh(new THREE.TubeGeometry(c,24,.55,8),mat(0x0b0c0e,{metalness:.1,roughness:.8}));t.castShadow=true;g.add(t)};
+      mk(-1.5);mk(1.5);
+      reg('cooler',g,[10,22,0]);S.anchor.cooler=new THREE.Vector3(radX,radY+3,radZ);
+    }else if(H0<8){ // low profile
+      box(H0,9.5,9.5,mc,sp.x+H0/2,sp.y,sp.z,g);fan(9,'x',sp.x+H0+.7,sp.y,sp.z,g);reg('cooler',g,[18,0,0]);S.anchor.cooler=sp.clone().add(new THREE.Vector3(H0+2,5.5,0));
+    }else{
+      box(.4,6,6,cu,sp.x+.2,sp.y,sp.z,g);
+      const towers=cl.towers||1;
+      for(let t=0;t<towers;t++){const dz=towers===2?(t?4.6:-4.6):0;
+        const nF=Math.round(H0*1.5);for(let i=0;i<nF;i++)box(.12,12,3.4,mc,sp.x+.7+i*(H0-.9)/(nF-1),sp.y,sp.z+dz,g);
+        for(let i=0;i<5;i++)cyl(.3,H0*.6,cu,sp.x+2+H0*.3,sp.y-4+i*2,sp.z+dz,g,10).rotation.z=Math.PI/2;
+        box(.3,12.2,3.6,mat(0x15171b,{metalness:.8,roughness:.3}),sp.x+H0+.05,sp.y,sp.z+dz,g);
+        dec(3.6,12,tx(144,480,(q,w,h)=>{q.save();q.translate(w/2,h/2);q.rotate(-Math.PI/2);logo(q,-130,0,26,c,cl.brand);tw(q,cl.brand.toUpperCase(),20,-22,52,'#fff','center',900);tw(q,sub(cl).toUpperCase(),20,34,34,c,'center',700);q.restore()}),sp.x+H0+.23,sp.y,sp.z+dz,g,0,.7)}
+      const fz=sp.z+(towers===2?0:2.5+1.4);
+      fan(12,'z',sp.x+Math.min(H0*.5+3.6,H0-6.2),sp.y,towers===2?sp.z:sp.z+4.9,g);
+      if(towers===2)fan(12,'z',sp.x+Math.min(H0*.5+3.6,H0-6.2),sp.y,sp.z+9.2,g);
+      reg('cooler',g,[26,0,0]);S.anchor.cooler=sp.clone().add(new THREE.Vector3(H0*.5,7,0));
+    }}
+  /* gpu */
+  const gpu=Pt('gpu');
+  if(gpu){const g=new THREE.Group();const gl=mmx(gpu.length||300),th=(gpu.slots||2)*2,gx=bx+.09+.7+11.5/2,c=bc(gpu);
+    const gy=O3.y+gpuTop-th/2,gz=zs+.6+gl/2;
+    const sh=mat(0x16181c,{metalness:.7,roughness:.35});
+    box(11.5,th,gl,sh,gx,gy,gz,g);
+    box(.15,th*.78,gl*.94,mat(0x2a2e37,{metalness:.85,roughness:.25}),gx+5.8,gy-.2,gz,g);
+    dec(gl*.94,th*.78,tx(1400,Math.round(1400*th*.78/(gl*.94)),(q,w,h)=>{
+      logo(q,w*.045,h*.5,h*.3,c,gpu.brand);tw(q,gpu.brand.toUpperCase(),w*.09,h*.5,h*.4,'#e9edf5','left',900);const bw=q.measureText(gpu.brand.toUpperCase()).width;
+      tw(q,sub(gpu).toUpperCase(),w*.09+bw+30,h*.5,h*.3,c,'left',800);
+      tw(q,`${gpu.vram}GB · ${gpu.tdp}W · ${gpu.conn}×8-PIN`,w*.97,h*.8,h*.13,'#aab3c2','right',700);q.fillStyle=c;q.fillRect(w*.7,h*.12,w*.27,h*.05)}),gx+5.89,gy-.2,gz,g,0,.55);
+    box(.2,.35,gl*.78,rgbMat(),gx+5.9,gy+th*.34,gz,g);
+    box(.2,.35,gl*.78,rgbMat(),gx+5.9,gy-th*.34-.4,gz,g);
+    box(.4,th+.8,12,mat(0x8a909b,{metalness:.9,roughness:.3}),bx+.4,gy,zs+.4,g);   // bracket
+    for(let i=0;i<3;i++)box(.5,th*.5,.7,blk,bx+.4,gy,zs+2+i*2.2,g);
+    const zc=zs+3+gl*.55;S.gpuPwr=new THREE.Vector3(gx+6.25,gy+th*.12,zc);
+    for(let i=0;i<gpu.conn;i++){box(.9,1.8,4.2,blk,gx+6.0,gy+th*.12,zc-i*4.8,g);box(.3,.35,3.4,mat(0xd8d8d8),gx+6.5,gy+th*.12+.7,zc-i*4.8,g)}
+    const nf=gl>28?3:2;for(let i=0;i<nf;i++)fan(Math.min(9.2,th*1.6+1),'y',gx-.5,gy-th/2-.02,zs+3+gl*(.2+.6*i/(nf-1||1)),g);
+    reg('gpu',g,[12,-9,5]);S.anchor.gpu=new THREE.Vector3(gx+6,gy+th/2+1,gz);
+  }
+  /* storage */
+  const st=Pt('storage');
+  if(st){const g=new THREE.Group();const c=bc(st),cap=st.capacity>=1000?st.capacity/1000+'TB':st.capacity+'GB';
+    if(st.iface==='NVMe'){const p=L(.5,sockL.y-5.2,sockL.z);box(.3,2.2,8,mat(0x14301f),p.x,p.y,p.z,g);box(.5,2.4,8.2,mat(0x3b4049,{metalness:.85,roughness:.3}),p.x+.45,p.y,p.z,g);
+      dec(8,2.2,tx(800,220,(q,w,h)=>{q.fillStyle='#1a1d24';q.fillRect(0,0,w,h);q.fillStyle=c;q.fillRect(0,0,w,10);logo(q,70,h/2+5,38,c,st.brand);tw(q,st.brand.toUpperCase(),130,70,52,'#fff','left',900);tw(q,sub(st).toUpperCase()+' · '+st.form,130,140,30,'#aab3c2','left',600);tw(q,cap,w-40,h/2+5,110,c,'right',900)}),p.x+.71,p.y,p.z,g,0,.5);
+      cyl(.25,.3,sil,p.x+.7,p.y,p.z+4.4,g,12).rotation.z=Math.PI/2;S.anchor.storage=p.clone().add(new THREE.Vector3(1,1.8,0))}
+    else{const hdd=st.form==='3.5"';const sx=-W/2+4,sy=hdd?3.4:3,sz=D/2-8,dw=hdd?14.7:10,dd=hdd?10:7,dh=hdd?2.6:.9;
+      box(dw,dh,dd,mat(hdd?0x9aa0ab:0x23262d,{metalness:.85,roughness:.35}),sx+2,sy+.2,sz,g);
+      const t=tx(Math.round(dw*70),Math.round(dd*70),(q,w,h)=>{q.fillStyle=hdd?'#d9dde4':'#1a1d24';q.fillRect(0,0,w,h);const fg=hdd?'#14161b':'#fff';q.fillStyle=c;q.fillRect(0,0,w,h*.07);
+        logo(q,w*.08,h*.26,h*.13,hdd?'#3b4150':c,st.brand);tw(q,st.brand.toUpperCase(),w*.16,h*.26,h*.18,fg,'left',900);tw(q,sub(st).toUpperCase(),w*.06,h*.52,h*.1,hdd?'#3b4150':c,'left',800);
+        tw(q,cap,w*.94,h*.36,h*.34,hdd?'#14161b':c,'right',900);tw(q,`${st.kind} · ${st.iface==='SATA'?'SATA 6Gb/s':st.iface} · ${st.form}`,w*.06,h*.68,h*.075,hdd?'#4a5060':'#aab3c2','left',600);
+        if(hdd)tw(q,'7200 RPM · 256MB CACHE',w*.06,h*.78,h*.075,'#4a5060','left',600);q.fillStyle=fg;for(let i=0;i<46;i++)q.fillRect(w*.58+i*w*.0085,h*.82,w*.003+(i%3)*w*.002,h*.12)});
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(dw*.96,dd*.94),new THREE.MeshStandardMaterial({map:t,roughness:.5,metalness:.3}));m.rotation.x=-Math.PI/2;m.position.set(sx+2,sy+.2+dh/2+.02,sz);g.add(m);
+      for(const[a,b]of[[-1,-1],[1,-1],[-1,1],[1,1]])cyl(.25,.1,sil,sx+2+a*dw*.44,sy+.2+dh/2+.04,sz+b*dd*.4,g,10);
+      S.anchor.storage=new THREE.Vector3(sx,sy+3,sz)}
+    reg('storage',g,[10,-5,12]);}
+  /* psu */
+  const psu=Pt('psu');
+  if(psu){const g=new THREE.Group();const sfx=psu.form==='SFX';const pw=sfx?12.5:15,ph=sfx?6.35:8.6,pl=mmx(psu.length||160),c=bc(psu);
+    const px=-W/2+.5+pw/2+2.5,py=.8+ph/2,pz=-D/2+.5+pl/2;
+    box(pw,ph,pl,mat(0x1a1c21,{metalness:.5,roughness:.55}),px,py,pz,g);
+    box(.1,ph*.6,pl*.55,mat(0x2c3039,{metalness:.8,roughness:.3}),px+pw/2+.02,py,pz+pl*.1,g);
+    box(.12,.3,pl*.4,rgbMat(),px+pw/2+.04,py+ph*.3,pz+pl*.1,g);
+    const sd=pw/2+.14;
+    dec(pl*.92,ph*.9,tx(960,Math.round(960*ph*.9/(pl*.92)),(q,w,h)=>{q.fillStyle='#101216';q.fillRect(0,0,w,h);q.fillStyle=c;q.fillRect(0,0,w,h*.06);
+      logo(q,w*.07,h*.34,h*.17,c,psu.brand);tw(q,psu.brand.toUpperCase(),w*.15,h*.3,h*.26,'#fff','left',900);tw(q,sub(psu).toUpperCase(),w*.15,h*.58,h*.15,c,'left',800);
+      q.strokeStyle=c;q.lineWidth=6;q.beginPath();q.arc(w*.86,h*.42,h*.22,0,7);q.stroke();tw(q,'80 PLUS',w*.86,h*.36,h*.07,'#fff');tw(q,psu.eff.replace('80+ ','').toUpperCase(),w*.86,h*.47,h*.09,c,'center',900);
+      tw(q,`${psu.watts}W · ${psu.form} · +12V ${Math.round(psu.watts/12)}A · ${psu.pcie}×PCIe 8-pin`,w*.06,h*.85,h*.075,'#aab3c2','left',600)}),px+sd,py,pz+pl*.04,g,0,.5);
+    const fz=pz+pl/2,lbs=['MB 24P','CPU 8P','PCIe','PCIe','SATA','SATA','PERI','PERI'];
+    lbs.forEach((s,i)=>{const r=i>>2,k=i&3;box(pw/4-.6,ph*.3,.5,blk,px-pw/2+pw*(k+.5)/4,py+(r?-1:1)*ph*.22,fz+.25,g)});
+    dec(pw,ph,tx(Math.round(pw*70),Math.round(ph*70),(q,w,h)=>lbs.forEach((s,i)=>tw(q,s,((i&3)+.5)/4*w,(.5-(i>>2?-.22:.22))*h,h*.075,'#9aa3b2','center',700))),px,py,fz+.52,g,0,.4,0);
+    const cab=(pts,r=.45)=>{const t=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),30,r,8),mat(0x08090b,{metalness:.1,roughness:.85}));t.castShadow=true;g.add(t)};
+    const pf=new THREE.Vector3(px+pw/2-3,py+ph/2,pz+pl/2);
+    cab([pf,pf.clone().add(new THREE.Vector3(1.5,3,3)),L(1.8,-ht*.05,len/2-1.3).add(new THREE.Vector3(0,-6,-3)),L(1.2,ht*.0,len/2-1.3)],.55);
+    if(gpu&&S.gpuPwr){const e=S.gpuPwr,p0=pf.clone().add(new THREE.Vector3(1,0,-2));cab([p0,p0.clone().add(new THREE.Vector3(2,4,0)),new THREE.Vector3((p0.x+e.x)/2+3,(p0.y+e.y)/2+1,(p0.z+e.z)/2),e.clone().add(new THREE.Vector3(.2,0,0))],.4)}
+    reg('psu',g,[10,-8,-10]);S.anchor.psu=new THREE.Vector3(px,py+ph,pz);
+  }
+  /* labels */
+  for(const c of CATS){const p=Pt(c.id);if(!p||!S.anchor[c.id])continue;const d=document.createElement('div');d.className='lbl';d.dataset.cat=c.id;d.textContent=p.name;$('#labels').append(d)}
+  applyOpts();
+}
+
+/* ---- loop ---- */
+function loop(now){
+  if(mq.matches&&TAB!=='view')return;
+  if(LOW()){if(now-(S.lt||0)<28)return;S.lt=now}
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  if(tween){tween.t+=dt/tween.dur;const k=Math.min(1,tween.t),e=1-Math.pow(1-k,3);controls.target.lerpVectors(tween.fromT,tween.toT,e);camera.position.lerpVectors(tween.fromP,tween.toP,e);if(k>=1)tween=null}
+  S.k+=((V.explode?1:0)-S.k)*Math.min(1,dt*5);
+  for(const e of S.expl)e.g.position.copy(e.v).multiplyScalar(S.k);
+  if(O.spin)for(const f of S.fans)f.rotation.z-=dt*(O.rgb?7:5);
+  if(O.rgb)for(const m of S.rgb){if(O.rainbow)m.emissive.setHSL((t*.12+m.userData.off)%1,1,.5);else m.emissive.set(O.rgbc);m.emissiveIntensity=2.2+Math.sin(t*2+m.userData.off*9)*.5}
+  else for(const m of S.rgb)m.emissiveIntensity=0;
+  controls.update();
+  if(tween||Math.abs((V.explode?1:0)-S.k)>.002||(S.fr=(S.fr||0)+1)%10===0||S.shadowDirty){renderer.shadowMap.needsUpdate=true;S.shadowDirty=false}
+  // highlights
+  const show=(h,c)=>{if(c&&S.groups[c]){h.box.copy(catBox(c));h.visible=!h.box.isEmpty()}else h.visible=false};
+  {const hc=hoverCat&&hoverCat!==sel?hoverCat:null,hk=hc+'|'+sel+'|'+S.k.toFixed(3)+'|'+S.sig;if(hk!==S.hk){S.hk=hk;show(hoverBox,hc);show(selBox,sel)}}
+  // labels
+  if(O.labels){const w=$('#view').clientWidth,h=$('#view').clientHeight;
+    for(const l of $('#labels').children){const c=l.dataset.cat,a=S.anchor[c];if(!a){continue}
+      const off=S.groups[c]?.[0]?.position||new THREE.Vector3();const v=(S._v||(S._v=new THREE.Vector3())).copy(a).add(off).project(camera);
+      const vis=v.z<1&&Math.abs(v.x)<1.1&&Math.abs(v.y)<1.1;l.style.display=vis?'':'none';
+      l.style.transform=`translate(${((v.x+1)/2*w).toFixed(1)}px,${((1-v.y)/2*h).toFixed(1)}px) translate(-50%,-100%)`;l.style.opacity=sel&&sel!==c?.4:1}}
+  if(LOW()||!composer)renderer.render(scene,camera);else composer.render(dt);
+}
+
+/* ---------------- boot ---------------- */
+let TAB='view';const mq=matchMedia('(max-width:900px)');
+function setTab(t){TAB=t;$('main').dataset.tab=t;document.querySelectorAll('#rail button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));if(t==='view'){S.rk='';S.shadowDirty=true;setTimeout(resize3D,30)}}
+$('#rail').onclick=e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.tab)};
+renderToolbar();
+$('#bname').value=cur().name;
+// before 3D is ready, refresh() must not touch the scene
+refresh();
+loadFromHash();
+window.pcforge={analyze,total,power,catalog:()=>catalog,get build(){return cur()}};
+init3D().then(()=>{if(S.ok){refresh();}}).catch(e=>fail3D('3D failed to start: '+e.message));
+</script>
+</body>
+</html>
